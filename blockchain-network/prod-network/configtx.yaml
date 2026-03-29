@@ -1,0 +1,187 @@
+# Copyright IBM Corp. All Rights Reserved.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+---
+Organizations:
+  - &OrdererOrg
+    Name: OrdererOrg
+    ID: OrdererMSP
+    MSPDir: ./organizations/ordererOrganizations/example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer.example.com:7050
+
+  - &Vyrobca
+    Name: VyrobcaMSP
+    ID: VyrobcaMSP
+    MSPDir: ./organizations/peerOrganizations/vyrobca.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('VyrobcaMSP.admin', 'VyrobcaMSP.peer', 'VyrobcaMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('VyrobcaMSP.admin', 'VyrobcaMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('VyrobcaMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('VyrobcaMSP.peer')"
+
+  - &LekarenA
+    Name: LekarenAMSP
+    ID: LekarenAMSP
+    MSPDir: ./organizations/peerOrganizations/lekarena.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('LekarenAMSP.admin', 'LekarenAMSP.peer', 'LekarenAMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('LekarenAMSP.admin', 'LekarenAMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('LekarenAMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('LekarenAMSP.peer')"
+
+  - &LekarenB
+    Name: LekarenBMSP
+    ID: LekarenBMSP
+    MSPDir: ./organizations/peerOrganizations/lekarenb.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('LekarenBMSP.admin', 'LekarenBMSP.peer', 'LekarenBMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('LekarenBMSP.admin', 'LekarenBMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('LekarenBMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('LekarenBMSP.peer')"
+
+  - &SUKL
+    Name: SUKLMSP
+    ID: SUKLMSP
+    MSPDir: ./organizations/peerOrganizations/sukl.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('SUKLMSP.admin', 'SUKLMSP.peer', 'SUKLMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('SUKLMSP.admin', 'SUKLMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('SUKLMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('SUKLMSP.peer')"
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer.example.com:7050
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  ChannelUsingRaft:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+      Capabilities:
+        <<: *OrdererCapabilities
+      EtcdRaft:
+        Consenters:
+          - Host: orderer.example.com
+            Port: 7050
+            ClientTLSCert: ./organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+            ServerTLSCert: ./organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Vyrobca
+        - *LekarenA
+        - *LekarenB
+        - *SUKL
+      Capabilities:
+        <<: *ApplicationCapabilities
