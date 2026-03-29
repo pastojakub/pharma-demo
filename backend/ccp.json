@@ -1,0 +1,121 @@
+{
+  "name": "pharma-network",
+  "version": "1.0.0",
+  "client": {
+    "organization": "VyrobcaMSP",
+    "connection": {
+      "timeout": {
+        "peer": {
+          "endorser": "300"
+        }
+      }
+    }
+  },
+  "channels": {
+    "mychannel": {
+      "orderers": ["orderer.example.com"],
+      "peers": {
+        "peer0.vyrobca.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "eventSource": true
+        },
+        "peer0.lekarena.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "eventSource": true
+        },
+        "peer0.lekarenb.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "eventSource": true
+        },
+        "peer0.sukl.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "eventSource": true
+        }
+      }
+    }
+  },
+  "organizations": {
+    "VyrobcaMSP": {
+      "mspid": "VyrobcaMSP",
+      "peers": ["peer0.vyrobca.example.com"],
+      "certificateAuthorities": ["ca-vyrobca"]
+    },
+    "LekarenAMSP": {
+      "mspid": "LekarenAMSP",
+      "peers": ["peer0.lekarena.example.com"],
+      "certificateAuthorities": ["ca-lekarena"]
+    },
+    "LekarenBMSP": {
+      "mspid": "LekarenBMSP",
+      "peers": ["peer0.lekarenb.example.com"],
+      "certificateAuthorities": ["ca-lekarenb"]
+    },
+    "SUKLMSP": {
+      "mspid": "SUKLMSP",
+      "peers": ["peer0.sukl.example.com"],
+      "certificateAuthorities": ["ca-sukl"]
+    }
+  },
+  "orderers": {
+    "orderer.example.com": {
+      "url": "grpcs://localhost:7050",
+      "grpcOptions": {
+        "ssl-target-name-override": "orderer.example.com"
+      },
+      "tlsCACerts": {
+        "path": "wallet/ca/tls-ca.crt"
+      }
+    }
+  },
+  "peers": {
+    "peer0.vyrobca.example.com": {
+      "url": "grpcs://localhost:7051",
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.vyrobca.example.com"
+      },
+      "tlsCACerts": {
+        "path": "wallet/ca/vyrobca-ca.crt"
+      }
+    },
+    "peer0.lekarena.example.com": {
+      "url": "grpcs://localhost:9051",
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.lekarena.example.com"
+      },
+      "tlsCACerts": {
+        "path": "wallet/ca/lekarena-ca.crt"
+      }
+    },
+    "peer0.lekarenb.example.com": {
+      "url": "grpcs://localhost:11051",
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.lekarenb.example.com"
+      },
+      "tlsCACerts": {
+        "path": "wallet/ca/lekarenb-ca.crt"
+      }
+    },
+    "peer0.sukl.example.com": {
+      "url": "grpcs://localhost:13051",
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.sukl.example.com"
+      },
+      "tlsCACerts": {
+        "path": "wallet/ca/sukl-ca.crt"
+      }
+    }
+  },
+  "certificateAuthorities": {
+    "ca-vyrobca": {
+      "url": "https://localhost:7054",
+      "caName": "ca-vyrobca",
+      "tlsCACerts": {
+        "path": "wallet/ca/vyrobca-ca.crt"
+      }
+    }
+  }
+}

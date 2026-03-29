@@ -1,0 +1,7 @@
+{
+  "channel": "mychannel",
+  "cc": "drug",
+  "mspId": "VyrobcaMSP",
+  "ccpPath": "./ccp.json",
+  "walletPath": "./wallet"
+}
