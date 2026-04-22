@@ -1,0 +1,29 @@
+services:
+  mariadb:
+    image: mariadb:10.11
+    container_name: pharma-mariadb
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: pharma_db
+      MYSQL_USER: pharma_user
+      MYSQL_PASSWORD: pharma_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: pharma-phpmyadmin
+    restart: always
+    environment:
+      PMA_HOST: mariadb
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "8080:80"
+    depends_on:
+      - mariadb
+
+volumes:
+  mariadb_data:
