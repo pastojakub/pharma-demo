@@ -94,6 +94,24 @@ Organizations:
         Type: Signature
         Rule: "OR('SUKLMSP.peer')"
 
+  - &Public
+    Name: PublicMSP
+    ID: PublicMSP
+    MSPDir: ./organizations/peerOrganizations/public.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('PublicMSP.admin', 'PublicMSP.peer', 'PublicMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('PublicMSP.admin')"
+      Admins:
+        Type: Signature
+        Rule: "OR('PublicMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('PublicMSP.peer')"
+
 Capabilities:
   Channel: &ChannelCapabilities
     V2_0: true
@@ -183,5 +201,6 @@ Profiles:
         - *LekarenA
         - *LekarenB
         - *SUKL
+        - *Public
       Capabilities:
         <<: *ApplicationCapabilities

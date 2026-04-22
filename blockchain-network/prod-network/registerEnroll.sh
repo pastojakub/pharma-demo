@@ -40,46 +40,62 @@ function createOrg() {
   # 1. Enroll CA Admin (Bootstrap Admin)
   infoln "Enrolling CA Admin for ${ORG_NAME}"
   set -x
-  fabric-ca-client enroll -u https://admin:adminpw@localhost:${CA_PORT} --caname ca-${ORG_NAME} --tls.certfiles "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem"
+  
+  # Special case for public organization CA path
+  CA_DIR=${ORG_NAME}
+  if [ "${ORG_NAME}" == "public" ]; then CA_DIR="publicOrg"; fi
+  
+  # CA Name correction to match docker-compose (ca_public instead of ca-public)
+  CANAME="ca-${ORG_NAME}"
+  if [ "${ORG_NAME}" == "public" ]; then CANAME="ca_public"; fi
+
+  fabric-ca-client enroll -u https://admin:adminpw@localhost:${CA_PORT} --caname ${CANAME} --tls.certfiles "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem"
   { set +x; } 2>/dev/null
 
   # 2. Define NodeOUs
   echo "NodeOUs:
   Enable: true
   ClientOUIdentifier:
-    Certificate: cacerts/localhost-${CA_PORT}-ca-${ORG_NAME}.pem
+    Certificate: cacerts/localhost-${CA_PORT}-${CANAME}.pem
     OrganizationalUnitIdentifier: client
   PeerOUIdentifier:
-    Certificate: cacerts/localhost-${CA_PORT}-ca-${ORG_NAME}.pem
+    Certificate: cacerts/localhost-${CA_PORT}-${CANAME}.pem
     OrganizationalUnitIdentifier: peer
   AdminOUIdentifier:
-    Certificate: cacerts/localhost-${CA_PORT}-ca-${ORG_NAME}.pem
+    Certificate: cacerts/localhost-${CA_PORT}-${CANAME}.pem
     OrganizationalUnitIdentifier: admin
   OrdererOUIdentifier:
-    Certificate: cacerts/localhost-${CA_PORT}-ca-${ORG_NAME}.pem
+    Certificate: cacerts/localhost-${CA_PORT}-${CANAME}.pem
     OrganizationalUnitIdentifier: orderer" > "${ORG_DIR}/msp/config.yaml"
 
   # 3. Setup CA certs for MSP
   mkdir -p "${ORG_DIR}/msp/tlscacerts"
-  cp "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem" "${ORG_DIR}/msp/tlscacerts/ca.crt"
+  cp "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem" "${ORG_DIR}/msp/tlscacerts/ca.crt"
   mkdir -p "${ORG_DIR}/tlsca"
-  cp "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem" "${ORG_DIR}/tlsca/tlsca.${DOMAIN}-cert.pem"
+  cp "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem" "${ORG_DIR}/tlsca/tlsca.${DOMAIN}-cert.pem"
   mkdir -p "${ORG_DIR}/ca"
-  cp "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem" "${ORG_DIR}/ca/ca.${DOMAIN}-cert.pem"
+  cp "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem" "${ORG_DIR}/ca/ca.${DOMAIN}-cert.pem"
 
   # 4. Register Identities (Using unique name for org admin)
   infoln "Registering peer, user and admin for ${ORG_NAME}"
+  
+  # Determine role based on org
+  ROLE="user"
+  if [ "$ORG_NAME" == "vyrobca" ]; then ROLE="manufacturer"; fi
+  if [ "$ORG_NAME" == "sukl" ]; then ROLE="regulator"; fi
+  if [[ "$ORG_NAME" == lekaren* ]]; then ROLE="pharmacy"; fi
+
   set -x
-  fabric-ca-client register --caname ca-${ORG_NAME} --id.name ${PEER_NAME} --id.secret ${PEER_NAME}pw --id.type peer --tls.certfiles "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem"
-  fabric-ca-client register --caname ca-${ORG_NAME} --id.name ${ORG_NAME}user --id.secret ${ORG_NAME}userpw --id.type client --tls.certfiles "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem"
-  fabric-ca-client register --caname ca-${ORG_NAME} --id.name ${ORG_NAME}admin --id.secret ${ORG_NAME}adminpw --id.type admin --tls.certfiles "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem"
+  fabric-ca-client register --caname ${CANAME} --id.name ${PEER_NAME} --id.secret ${PEER_NAME}pw --id.type peer --tls.certfiles "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem"
+  fabric-ca-client register --caname ${CANAME} --id.name ${ORG_NAME}user --id.secret ${ORG_NAME}userpw --id.type client --id.attrs "role=${ROLE}:ecert" --tls.certfiles "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem"
+  fabric-ca-client register --caname ${CANAME} --id.name ${ORG_NAME}admin --id.secret ${ORG_NAME}adminpw --id.type admin --id.attrs "role=${ROLE}:ecert" --tls.certfiles "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem"
   { set +x; } 2>/dev/null
 
   # 5. Enroll Peer MSP & TLS
   infoln "Enrolling Peer MSP and TLS for ${PEER_NAME}"
   set -x
-  fabric-ca-client enroll -u https://${PEER_NAME}:${PEER_NAME}pw@localhost:${CA_PORT} --caname ca-${ORG_NAME} -M "${ORG_DIR}/peers/${PEER_NAME}.${DOMAIN}/msp" --tls.certfiles "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem"
-  fabric-ca-client enroll -u https://${PEER_NAME}:${PEER_NAME}pw@localhost:${CA_PORT} --caname ca-${ORG_NAME} -M "${ORG_DIR}/peers/${PEER_NAME}.${DOMAIN}/tls" --enrollment.profile tls --csr.hosts ${PEER_NAME}.${DOMAIN} --csr.hosts localhost --tls.certfiles "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem"
+  fabric-ca-client enroll -u https://${PEER_NAME}:${PEER_NAME}pw@localhost:${CA_PORT} --caname ${CANAME} -M "${ORG_DIR}/peers/${PEER_NAME}.${DOMAIN}/msp" --tls.certfiles "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem"
+  fabric-ca-client enroll -u https://${PEER_NAME}:${PEER_NAME}pw@localhost:${CA_PORT} --caname ${CANAME} -M "${ORG_DIR}/peers/${PEER_NAME}.${DOMAIN}/tls" --enrollment.profile tls --csr.hosts ${PEER_NAME}.${DOMAIN} --csr.hosts localhost --tls.certfiles "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem"
   { set +x; } 2>/dev/null
 
   # Finalize TLS filenames for the container
@@ -96,8 +112,8 @@ function createOrg() {
   # 6. Enroll Org Admin & User (Using the registered identities)
   infoln "Enrolling Admin and User"
   set -x
-  fabric-ca-client enroll -u https://${ORG_NAME}admin:${ORG_NAME}adminpw@localhost:${CA_PORT} --caname ca-${ORG_NAME} -M "${ORG_DIR}/users/Admin@${DOMAIN}/msp" --tls.certfiles "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem"
-  fabric-ca-client enroll -u https://${ORG_NAME}user:${ORG_NAME}userpw@localhost:${CA_PORT} --caname ca-${ORG_NAME} -M "${ORG_DIR}/users/User1@${DOMAIN}/msp" --tls.certfiles "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem"
+  fabric-ca-client enroll -u https://${ORG_NAME}admin:${ORG_NAME}adminpw@localhost:${CA_PORT} --caname ${CANAME} -M "${ORG_DIR}/users/Admin@${DOMAIN}/msp" --tls.certfiles "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem"
+  fabric-ca-client enroll -u https://${ORG_NAME}user:${ORG_NAME}userpw@localhost:${CA_PORT} --caname ${CANAME} -M "${ORG_DIR}/users/User1@${DOMAIN}/msp" --tls.certfiles "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem"
   { set +x; } 2>/dev/null
   
   cp "${ORG_DIR}/msp/config.yaml" "${ORG_DIR}/users/Admin@${DOMAIN}/msp/config.yaml"
@@ -105,7 +121,7 @@ function createOrg() {
   
   # Ensure tlscacerts is present in user MSPs for CLI trust
   mkdir -p "${ORG_DIR}/users/Admin@${DOMAIN}/msp/tlscacerts"
-  cp "${PWD}/organizations/fabric-ca/${ORG_NAME}/ca-cert.pem" "${ORG_DIR}/users/Admin@${DOMAIN}/msp/tlscacerts/ca.crt"
+  cp "${PWD}/organizations/fabric-ca/${CA_DIR}/ca-cert.pem" "${ORG_DIR}/users/Admin@${DOMAIN}/msp/tlscacerts/ca.crt"
 }
 
 function createOrderer() {
@@ -171,10 +187,12 @@ waitForCA vyrobca ${VYROBCA_CA_PORT}
 waitForCA lekarena ${LEKARENA_CA_PORT}
 waitForCA lekarenb ${LEKARENB_CA_PORT}
 waitForCA sukl ${SUKL_CA_PORT}
+waitForCA publicOrg ${PUBLIC_CA_PORT}
 waitForCA ordererOrg ${ORDERER_CA_PORT}
 
 createOrg vyrobca ${VYROBCA_DOMAIN} ${VYROBCA_CA_PORT} VyrobcaMSP peer0
 createOrg lekarena ${LEKARENA_DOMAIN} ${LEKARENA_CA_PORT} LekarenAMSP peer0
 createOrg lekarenb ${LEKARENB_DOMAIN} ${LEKARENB_CA_PORT} LekarenBMSP peer0
 createOrg sukl ${SUKL_DOMAIN} ${SUKL_CA_PORT} SUKLMSP peer0
+createOrg public ${PUBLIC_DOMAIN} ${PUBLIC_CA_PORT} PublicMSP peer0
 createOrderer

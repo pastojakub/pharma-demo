@@ -3,7 +3,7 @@
 # Configuration
 export PATH=${PWD}/../bin:$PATH
 export FABRIC_CFG_PATH=${PWD}/peercfg
-CHANNEL_NAME="mychannel"
+CHANNEL_NAME="pharma-global-channel"
 CC_NAME="drug"
 
 # Set the correct path to the Orderer TLS CA

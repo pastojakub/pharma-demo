@@ -4,97 +4,114 @@
 #
 
 networks:
-  test:
-    name: fabric_test
+    test:
+        name: fabric_test
 
 services:
+    ca_vyrobca:
+        image: hyperledger/fabric-ca:${CA_VERSION}
+        environment:
+            - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+            - FABRIC_CA_SERVER_CA_NAME=ca-vyrobca
+            - FABRIC_CA_SERVER_TLS_ENABLED=true
+            - FABRIC_CA_SERVER_PORT=${VYROBCA_CA_PORT}
+            - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:17054
+        ports:
+            - "${VYROBCA_CA_PORT}:${VYROBCA_CA_PORT}"
+            - "17054:17054"
+        command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+        volumes:
+            - ../prod-network/organizations/fabric-ca/vyrobca:/etc/hyperledger/fabric-ca-server
+        container_name: ca_vyrobca
+        networks:
+            - test
 
-  ca_vyrobca:
-    image: hyperledger/fabric-ca:${CA_VERSION}
-    environment:
-      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
-      - FABRIC_CA_SERVER_CA_NAME=ca-vyrobca
-      - FABRIC_CA_SERVER_TLS_ENABLED=true
-      - FABRIC_CA_SERVER_PORT=${VYROBCA_CA_PORT}
-      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:17054
-    ports:
-      - "${VYROBCA_CA_PORT}:${VYROBCA_CA_PORT}"
-      - "17054:17054"
-    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
-    volumes:
-      - ../prod-network/organizations/fabric-ca/vyrobca:/etc/hyperledger/fabric-ca-server
-    container_name: ca_vyrobca
-    networks:
-      - test
+    ca_lekarena:
+        image: hyperledger/fabric-ca:${CA_VERSION}
+        environment:
+            - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+            - FABRIC_CA_SERVER_CA_NAME=ca-lekarena
+            - FABRIC_CA_SERVER_TLS_ENABLED=true
+            - FABRIC_CA_SERVER_PORT=${LEKARENA_CA_PORT}
+            - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:18054
+        ports:
+            - "${LEKARENA_CA_PORT}:${LEKARENA_CA_PORT}"
+            - "18054:18054"
+        command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+        volumes:
+            - ../prod-network/organizations/fabric-ca/lekarena:/etc/hyperledger/fabric-ca-server
+        container_name: ca_lekarena
+        networks:
+            - test
 
-  ca_lekarena:
-    image: hyperledger/fabric-ca:${CA_VERSION}
-    environment:
-      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
-      - FABRIC_CA_SERVER_CA_NAME=ca-lekarena
-      - FABRIC_CA_SERVER_TLS_ENABLED=true
-      - FABRIC_CA_SERVER_PORT=${LEKARENA_CA_PORT}
-      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:18054
-    ports:
-      - "${LEKARENA_CA_PORT}:${LEKARENA_CA_PORT}"
-      - "18054:18054"
-    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
-    volumes:
-      - ../prod-network/organizations/fabric-ca/lekarena:/etc/hyperledger/fabric-ca-server
-    container_name: ca_lekarena
-    networks:
-      - test
+    ca_lekarenb:
+        image: hyperledger/fabric-ca:${CA_VERSION}
+        environment:
+            - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+            - FABRIC_CA_SERVER_CA_NAME=ca-lekarenb
+            - FABRIC_CA_SERVER_TLS_ENABLED=true
+            - FABRIC_CA_SERVER_PORT=${LEKARENB_CA_PORT}
+            - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:19054
+        ports:
+            - "${LEKARENB_CA_PORT}:${LEKARENB_CA_PORT}"
+            - "19054:19054"
+        command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+        volumes:
+            - ../prod-network/organizations/fabric-ca/lekarenb:/etc/hyperledger/fabric-ca-server
+        container_name: ca_lekarenb
+        networks:
+            - test
 
-  ca_lekarenb:
-    image: hyperledger/fabric-ca:${CA_VERSION}
-    environment:
-      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
-      - FABRIC_CA_SERVER_CA_NAME=ca-lekarenb
-      - FABRIC_CA_SERVER_TLS_ENABLED=true
-      - FABRIC_CA_SERVER_PORT=${LEKARENB_CA_PORT}
-      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:19054
-    ports:
-      - "${LEKARENB_CA_PORT}:${LEKARENB_CA_PORT}"
-      - "19054:19054"
-    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
-    volumes:
-      - ../prod-network/organizations/fabric-ca/lekarenb:/etc/hyperledger/fabric-ca-server
-    container_name: ca_lekarenb
-    networks:
-      - test
+    ca_sukl:
+        image: hyperledger/fabric-ca:${CA_VERSION}
+        environment:
+            - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+            - FABRIC_CA_SERVER_CA_NAME=ca-sukl
+            - FABRIC_CA_SERVER_TLS_ENABLED=true
+            - FABRIC_CA_SERVER_PORT=${SUKL_CA_PORT}
+            - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:20054
+        ports:
+            - "${SUKL_CA_PORT}:${SUKL_CA_PORT}"
+            - "20054:20054"
+        command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+        volumes:
+            - ../prod-network/organizations/fabric-ca/sukl:/etc/hyperledger/fabric-ca-server
+        container_name: ca_sukl
+        networks:
+            - test
 
-  ca_sukl:
-    image: hyperledger/fabric-ca:${CA_VERSION}
-    environment:
-      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
-      - FABRIC_CA_SERVER_CA_NAME=ca-sukl
-      - FABRIC_CA_SERVER_TLS_ENABLED=true
-      - FABRIC_CA_SERVER_PORT=${SUKL_CA_PORT}
-      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:20054
-    ports:
-      - "${SUKL_CA_PORT}:${SUKL_CA_PORT}"
-      - "20054:20054"
-    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
-    volumes:
-      - ../prod-network/organizations/fabric-ca/sukl:/etc/hyperledger/fabric-ca-server
-    container_name: ca_sukl
-    networks:
-      - test
+    ca_public:
+        image: hyperledger/fabric-ca:${CA_VERSION}
+        environment:
+            - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+            - FABRIC_CA_SERVER_CA_NAME=ca_public
+            - FABRIC_CA_SERVER_TLS_ENABLED=true
+            - FABRIC_CA_SERVER_PORT=${PUBLIC_CA_PORT}
+            - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:22054
+        ports:
+            - "${PUBLIC_CA_PORT}:${PUBLIC_CA_PORT}"
+            - "22054:22054"
+        command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+        volumes:
+            - ../prod-network/organizations/fabric-ca/publicOrg:/etc/hyperledger/fabric-ca-server
+        container_name: ca_public
+        networks:
+            - test
 
-  ca_orderer:
-    image: hyperledger/fabric-ca:${CA_VERSION}
-    environment:
-      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
-      - FABRIC_CA_SERVER_CA_NAME=ca-orderer
-      - FABRIC_CA_SERVER_TLS_ENABLED=true
-      - FABRIC_CA_SERVER_PORT=${ORDERER_CA_PORT}
-      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:21054
-    ports:
-      - "${ORDERER_CA_PORT}:${ORDERER_CA_PORT}"
-      - "21054:21054"
-    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
-    volumes:
-      - ../prod-network/organizations/fabric-ca/ordererOrg:/etc/hyperledger/fabric-ca-server
-    container_name: ca_orderer
-    networks:
-      - test
+    ca_orderer:
+        image: hyperledger/fabric-ca:${CA_VERSION}
+        environment:
+            - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+            - FABRIC_CA_SERVER_CA_NAME=ca-orderer
+            - FABRIC_CA_SERVER_TLS_ENABLED=true
+            - FABRIC_CA_SERVER_PORT=${ORDERER_CA_PORT}
+            - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:21054
+        ports:
+            - "${ORDERER_CA_PORT}:${ORDERER_CA_PORT}"
+            - "21054:21054"
+        command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+        volumes:
+            - ../prod-network/organizations/fabric-ca/ordererOrg:/etc/hyperledger/fabric-ca-server
+        container_name: ca_orderer
+        networks:
+            - test

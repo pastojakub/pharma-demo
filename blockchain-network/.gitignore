@@ -1,0 +1,5 @@
+*.md
+*.tar.gz
+.env
+organizations
+channel-artifacts

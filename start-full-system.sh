@@ -54,7 +54,11 @@ infoln "7. Syncing certificates to Backend..."
 cd ../../backend
 chmod +x sync-certs.sh
 sudo ./sync-certs.sh
-sudo chown -R $USER:$USER ./wallet
+
+# Use SUDO_USER if running under sudo, otherwise use USER
+FIX_USER=${SUDO_USER:-$USER}
+infoln "Fixing wallet ownership for user: $FIX_USER"
+sudo chown -R $FIX_USER:$FIX_USER ./wallet
 successln "Backend wallet updated."
 
 echo "----------------------------------------------------------------"

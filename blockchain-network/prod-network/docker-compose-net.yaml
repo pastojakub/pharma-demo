@@ -14,32 +14,35 @@ services:
         environment:
             - FABRIC_LOGGING_SPEC=INFO
             - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
-            - ORDERER_GENERAL_LISTENPORT=${ORDERER_PORT}
+            - ORDERER_GENERAL_LISTENPORT=7050
             - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
             - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
             - ORDERER_GENERAL_TLS_ENABLED=true
             - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
             - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
-            - ORDERER_GENERAL_TLS_ROOTCAS=/var/hyperledger/orderer/tls/ca.crt
+            - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+            - ORDERER_KAFKA_TOPIC_REPLICATIONFACTOR=1
+            - ORDERER_KAFKA_VERBOSE=true
             - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
             - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
-            - ORDERER_GENERAL_CLUSTER_ROOTCAS=/var/hyperledger/orderer/tls/ca.crt
-            - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+            - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
             - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+            - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+            - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
             - ORDERER_ADMIN_TLS_ENABLED=true
-            - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
             - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
-            - ORDERER_ADMIN_TLS_ROOTCAS=/var/hyperledger/orderer/tls/ca.crt
-            - ORDERER_ADMIN_TLS_CLIENTROOTCAS=/var/hyperledger/orderer/tls/ca.crt
-            - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:${ORDERER_ADMIN_PORT}
-        working_dir: /root
+            - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+            - ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+            - ORDERER_ADMIN_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+        working_dir: /opt/gopath/src/github.com/hyperledger/fabric
         command: orderer
+        ports:
+            - 7050:7050
+            - 7053:7053
         volumes:
             - ./organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp:/var/hyperledger/orderer/msp
-            - ./organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/:/var/hyperledger/orderer/tls
-        ports:
-            - ${ORDERER_PORT}:${ORDERER_PORT}
-            - ${ORDERER_ADMIN_PORT}:${ORDERER_ADMIN_PORT}
+            - ./organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls:/var/hyperledger/orderer/tls
+            - orderer.example.com:/var/hyperledger/production/orderer
         networks:
             - test
 
@@ -58,6 +61,7 @@ services:
             - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
             - CORE_PEER_CHAINCODEADDRESS=peer0.vyrobca.example.com:7052
             - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+            - CORE_PEER_GOSSIP_ENDPOINT=peer0.vyrobca.example.com:7051
             - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.vyrobca.example.com:7051
             - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.vyrobca.example.com:7051
             - CORE_PEER_GOSSIP_USELEADERELECTION=true
@@ -75,6 +79,7 @@ services:
             - ./organizations/peerOrganizations/vyrobca.example.com/peers/peer0.vyrobca.example.com:/etc/hyperledger/fabric
             - ./peercfg:/etc/hyperledger/peercfg
             - /var/run/docker.sock:/var/run/docker.sock
+            - peer0.vyrobca.example.com:/var/hyperledger/production
         ports:
             - 7051:7051
         depends_on:
@@ -108,8 +113,9 @@ services:
             - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
             - CORE_PEER_CHAINCODEADDRESS=peer0.lekarena.example.com:7052
             - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+            - CORE_PEER_GOSSIP_ENDPOINT=peer0.lekarena.example.com:7051
             - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.lekarena.example.com:7051
-            - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.vyrobca.example.com:7051
+            - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.lekarena.example.com:7051
             - CORE_PEER_GOSSIP_USELEADERELECTION=true
             - CORE_PEER_GOSSIP_ORGLEADER=false
             - CORE_PEER_LOCALMSPID=LekarenAMSP
@@ -125,6 +131,7 @@ services:
             - ./organizations/peerOrganizations/lekarena.example.com/peers/peer0.lekarena.example.com:/etc/hyperledger/fabric
             - ./peercfg:/etc/hyperledger/peercfg
             - /var/run/docker.sock:/var/run/docker.sock
+            - peer0.lekarena.example.com:/var/hyperledger/production
         ports:
             - 9051:7051
         depends_on:
@@ -158,8 +165,9 @@ services:
             - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
             - CORE_PEER_CHAINCODEADDRESS=peer0.lekarenb.example.com:7052
             - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+            - CORE_PEER_GOSSIP_ENDPOINT=peer0.lekarenb.example.com:7051
             - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.lekarenb.example.com:7051
-            - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.vyrobca.example.com:7051
+            - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.lekarenb.example.com:7051
             - CORE_PEER_GOSSIP_USELEADERELECTION=true
             - CORE_PEER_GOSSIP_ORGLEADER=false
             - CORE_PEER_LOCALMSPID=LekarenBMSP
@@ -175,6 +183,7 @@ services:
             - ./organizations/peerOrganizations/lekarenb.example.com/peers/peer0.lekarenb.example.com:/etc/hyperledger/fabric
             - ./peercfg:/etc/hyperledger/peercfg
             - /var/run/docker.sock:/var/run/docker.sock
+            - peer0.lekarenb.example.com:/var/hyperledger/production
         ports:
             - 11051:7051
         depends_on:
@@ -208,8 +217,9 @@ services:
             - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
             - CORE_PEER_CHAINCODEADDRESS=peer0.sukl.example.com:7052
             - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+            - CORE_PEER_GOSSIP_ENDPOINT=peer0.sukl.example.com:7051
             - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.sukl.example.com:7051
-            - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.vyrobca.example.com:7051
+            - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.sukl.example.com:7051
             - CORE_PEER_GOSSIP_USELEADERELECTION=true
             - CORE_PEER_GOSSIP_ORGLEADER=false
             - CORE_PEER_LOCALMSPID=SUKLMSP
@@ -225,6 +235,7 @@ services:
             - ./organizations/peerOrganizations/sukl.example.com/peers/peer0.sukl.example.com:/etc/hyperledger/fabric
             - ./peercfg:/etc/hyperledger/peercfg
             - /var/run/docker.sock:/var/run/docker.sock
+            - peer0.sukl.example.com:/var/hyperledger/production
         ports:
             - 13051:7051
         depends_on:
@@ -242,3 +253,63 @@ services:
             - "11984:5984"
         networks:
             - test
+
+    peer0.public.example.com:
+        container_name: peer0.public.example.com
+        image: hyperledger/fabric-peer:${FABRIC_VERSION}
+        environment:
+            - FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+            - FABRIC_LOGGING_SPEC=INFO
+            - CORE_PEER_TLS_ENABLED=true
+            - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+            - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+            - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+            - CORE_PEER_ID=peer0.public.example.com
+            - CORE_PEER_ADDRESS=peer0.public.example.com:7051
+            - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+            - CORE_PEER_CHAINCODEADDRESS=peer0.public.example.com:7052
+            - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+            - CORE_PEER_GOSSIP_ENDPOINT=peer0.public.example.com:7051
+            - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.public.example.com:7051
+            - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.public.example.com:7051
+            - CORE_PEER_GOSSIP_USELEADERELECTION=true
+            - CORE_PEER_GOSSIP_ORGLEADER=false
+            - CORE_PEER_LOCALMSPID=PublicMSP
+            - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+            - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+            - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb_public:5984
+            - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+            - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+            - CORE_VM_ENDPOINT=unix:///var/run/docker.sock
+            - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_test
+            - CORE_LEDGER_HISTORY_ENABLEHISTORYDATABASE=true
+        volumes:
+            - ./organizations/peerOrganizations/public.example.com/peers/peer0.public.example.com:/etc/hyperledger/fabric
+            - ./peercfg:/etc/hyperledger/peercfg
+            - /var/run/docker.sock:/var/run/docker.sock
+            - peer0.public.example.com:/var/hyperledger/production
+        ports:
+            - 15051:7051
+        depends_on:
+            - couchdb_public
+        networks:
+            - test
+
+    couchdb_public:
+        container_name: couchdb_public
+        image: couchdb:3.3.3
+        environment:
+            - COUCHDB_USER=admin
+            - COUCHDB_PASSWORD=adminpw
+        ports:
+            - "13984:5984"
+        networks:
+            - test
+
+volumes:
+    orderer.example.com:
+    peer0.vyrobca.example.com:
+    peer0.lekarena.example.com:
+    peer0.lekarenb.example.com:
+    peer0.sukl.example.com:
+    peer0.public.example.com:

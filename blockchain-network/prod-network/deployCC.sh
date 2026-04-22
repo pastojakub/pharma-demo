@@ -3,12 +3,14 @@
 # Configuration
 export PATH=${PWD}/../bin:$PATH
 export FABRIC_CFG_PATH=${PWD}/peercfg
-CHANNEL_NAME="mychannel"
+CHANNEL_NAME="pharma-global-channel"
 CC_NAME="drug"
 CC_SRC_PATH="../../chaincode"
 CC_SRC_LANGUAGE="typescript"
-CC_VERSION="1.0"
-CC_SEQUENCE="1"
+CC_VERSION="1.6"
+CC_SEQUENCE="6"
+
+
 DELAY="3"
 MAX_RETRY="5"
 
@@ -55,28 +57,33 @@ setGlobals() {
     export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/sukl.example.com/tls/ca.crt
     export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/sukl.example.com/users/Admin@sukl.example.com/msp
     export CORE_PEER_ADDRESS=localhost:13051
+  elif [ $ORG -eq 5 ]; then
+    export CORE_PEER_LOCALMSPID="PublicMSP"
+    export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/public.example.com/tls/ca.crt
+    export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/public.example.com/users/Admin@public.example.com/msp
+    export CORE_PEER_ADDRESS=localhost:15051
   fi
 }
 
 ORDERER_CA=${PWD}/organizations/ordererOrganizations/example.com/tls/ca.crt
 
 # 2. Install Chaincode on all peers
-for org in 1 2 3 4; do
+for org in 1 2 3 4 5; do
   setGlobals $org
   infoln "Installing chaincode on peer0.org${org}..."
   set -x
   peer lifecycle chaincode install ${CC_NAME}.tar.gz
   res=$?
   { set +x; } 2>/dev/null
-  if [ $res -ne 0 ]; then fatalln "Chaincode installation failed on org ${org}"; fi
+  if [ $res -ne 0 ]; then infoln "Chaincode might already be installed on org ${org}"; fi
 done
 
 # 3. Approve for all orgs
-for org in 1 2 3 4; do
+for org in 1 2 3 4 5; do
   setGlobals $org
   infoln "Approving chaincode for org${org}..."
   set -x
-  peer lifecycle chaincode approveformyorg -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "$ORDERER_CA" --channelID $CHANNEL_NAME --name ${CC_NAME} --version ${CC_VERSION} --package-id ${PACKAGE_ID} --sequence ${CC_SEQUENCE} --signature-policy "OR('VyrobcaMSP.member', 'LekarenAMSP.member', 'LekarenBMSP.member', 'SUKLMSP.member')"
+  peer lifecycle chaincode approveformyorg -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "$ORDERER_CA" --channelID $CHANNEL_NAME --name ${CC_NAME} --version ${CC_VERSION} --package-id ${PACKAGE_ID} --sequence ${CC_SEQUENCE} --signature-policy "OR('VyrobcaMSP.member', 'LekarenAMSP.member', 'LekarenBMSP.member', 'SUKLMSP.member')" --collections-config ../../chaincode/collections_config.json
   res=$?
   { set +x; } 2>/dev/null
   if [ $res -ne 0 ]; then fatalln "Chaincode approval failed on org ${org}"; fi
@@ -85,7 +92,7 @@ done
 # 4. Check Commit Readiness
 setGlobals 1
 infoln "Checking commit readiness..."
-peer lifecycle chaincode checkcommitreadiness --channelID $CHANNEL_NAME --name ${CC_NAME} --version ${CC_VERSION} --sequence ${CC_SEQUENCE} --output json
+peer lifecycle chaincode checkcommitreadiness --channelID $CHANNEL_NAME --name ${CC_NAME} --version ${CC_VERSION} --sequence ${CC_SEQUENCE} --output json --collections-config ../../chaincode/collections_config.json
 
 # 5. Commit Definition
 infoln "Committing chaincode definition..."
@@ -95,7 +102,9 @@ peer lifecycle chaincode commit -o localhost:7050 --ordererTLSHostnameOverride o
   --peerAddresses localhost:9051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/lekarena.example.com/tls/ca.crt \
   --peerAddresses localhost:11051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/lekarenb.example.com/tls/ca.crt \
   --peerAddresses localhost:13051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/sukl.example.com/tls/ca.crt \
-  --version ${CC_VERSION} --sequence ${CC_SEQUENCE} --signature-policy "OR('VyrobcaMSP.member', 'LekarenAMSP.member', 'LekarenBMSP.member', 'SUKLMSP.member')"
+  --peerAddresses localhost:15051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/public.example.com/tls/ca.crt \
+  --version ${CC_VERSION} --sequence ${CC_SEQUENCE} --signature-policy "OR('VyrobcaMSP.member', 'LekarenAMSP.member', 'LekarenBMSP.member', 'SUKLMSP.member')" \
+  --collections-config ../../chaincode/collections_config.json
 res=$?
 { set +x; } 2>/dev/null
 if [ $res -ne 0 ]; then fatalln "Chaincode definition commit failed"; fi
