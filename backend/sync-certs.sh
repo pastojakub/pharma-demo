@@ -1,30 +1,66 @@
 #!/bin/bash
 
 # Configuration
-ORG_NAME="vyrobca"
 NETWORK_ROOT_PATH="../blockchain-network/prod-network/organizations/peerOrganizations"
 BACKEND_WALLET_PATH="./wallet"
 
-echo "Syncing Fabric certificates to backend wallet..."
+echo "Syncing ALL Fabric organizational certificates to backend wallet..."
 
-# Create local wallet structure
-mkdir -p ${BACKEND_WALLET_PATH}/ca
-mkdir -p ${BACKEND_WALLET_PATH}/admin/msp/keystore
-mkdir -p ${BACKEND_WALLET_PATH}/admin/msp/signcerts
+# Function to sync a specific Org
+sync_org() {
+  ORG_NAME=$1
+  DOMAIN=$2
+  
+  echo "Syncing $ORG_NAME ($DOMAIN)..."
+  mkdir -p ${BACKEND_WALLET_PATH}/${ORG_NAME}/admin/msp/keystore
+  mkdir -p ${BACKEND_WALLET_PATH}/${ORG_NAME}/admin/msp/signcerts
+  
+  # Copy Admin Certificate
+  cp ${NETWORK_ROOT_PATH}/${DOMAIN}/users/Admin@${DOMAIN}/msp/signcerts/cert.pem ${BACKEND_WALLET_PATH}/${ORG_NAME}/admin/msp/signcerts/cert.pem
+  
+  # Copy Admin Private Key (find the _sk file)
+  KEY_FILE=$(ls ${NETWORK_ROOT_PATH}/${DOMAIN}/users/Admin@${DOMAIN}/msp/keystore/*_sk)
+  cp ${KEY_FILE} ${BACKEND_WALLET_PATH}/${ORG_NAME}/admin/msp/keystore/admin.key
+  
+  # Copy TLS CA cert
+  mkdir -p ${BACKEND_WALLET_PATH}/ca
+  cp ${NETWORK_ROOT_PATH}/${DOMAIN}/tls/ca.crt ${BACKEND_WALLET_PATH}/ca/${ORG_NAME}-ca.crt
+}
 
-# 1. Copy TLS CA certificates for ALL organizations (needed for multi-peer connection)
-cp ${NETWORK_ROOT_PATH}/vyrobca.example.com/tls/ca.crt ${BACKEND_WALLET_PATH}/ca/vyrobca-ca.crt
-cp ${NETWORK_ROOT_PATH}/lekarena.example.com/tls/ca.crt ${BACKEND_WALLET_PATH}/ca/lekarena-ca.crt
-cp ${NETWORK_ROOT_PATH}/lekarenb.example.com/tls/ca.crt ${BACKEND_WALLET_PATH}/ca/lekarenb-ca.crt
-cp ${NETWORK_ROOT_PATH}/sukl.example.com/tls/ca.crt ${BACKEND_WALLET_PATH}/ca/sukl-ca.crt
-cp ../blockchain-network/prod-network/organizations/ordererOrganizations/example.com/tls/ca.crt ${BACKEND_WALLET_PATH}/ca/tls-ca.crt
+# Sync all 4 Orgs
+sync_org "vyrobca" "vyrobca.example.com"
+sync_org "lekarena" "lekarena.example.com"
+sync_org "lekarenb" "lekarenb.example.com"
+sync_org "sukl" "sukl.example.com"
 
-# 2. Copy Admin Certificate (Vyrobca)
-cp ${NETWORK_ROOT_PATH}/vyrobca.example.com/users/Admin@vyrobca.example.com/msp/signcerts/cert.pem ${BACKEND_WALLET_PATH}/admin/msp/signcerts/cert.pem
+# 5. Public (Patient)
+mkdir -p ${BACKEND_WALLET_PATH}/public/admin/msp/signcerts
+mkdir -p ${BACKEND_WALLET_PATH}/public/admin/msp/keystore
+cp ${NETWORK_ROOT_PATH}/public.example.com/msp/tlscacerts/ca.crt ${BACKEND_WALLET_PATH}/ca/public-ca.crt
+cp ${NETWORK_ROOT_PATH}/public.example.com/users/Admin@public.example.com/msp/signcerts/cert.pem ${BACKEND_WALLET_PATH}/public/admin/msp/signcerts/cert.pem
+# Find and copy the private key (it has a random hash name)
+PRIV_KEY=$(ls ${NETWORK_ROOT_PATH}/public.example.com/users/Admin@public.example.com/msp/keystore/*_sk)
+cp ${PRIV_KEY} ${BACKEND_WALLET_PATH}/public/admin/msp/keystore/admin.key
 
-# 3. Copy Admin Private Key (Vyrobca)
-KEY_FILE=$(ls ${NETWORK_ROOT_PATH}/vyrobca.example.com/users/Admin@vyrobca.example.com/msp/keystore/*_sk)
-cp ${KEY_FILE} ${BACKEND_WALLET_PATH}/admin/msp/keystore/admin.key
+# Also sync Orderer CA
+cp ../blockchain-network/prod-network/organizations/ordererOrganizations/example.com/tls/ca.crt ${BACKEND_WALLET_PATH}/ca/orderer-ca.crt
 
-echo "Successfully synced certificates to ${BACKEND_WALLET_PATH}"
-ls -R ${BACKEND_WALLET_PATH}/ca
+# --- Fix Permissions and Ownership ---
+echo "Fixing permissions for ${BACKEND_WALLET_PATH}..."
+
+# 1. Set full permissions for owner and read for others on directories
+chmod -R 755 ${BACKEND_WALLET_PATH}
+
+# 2. Set read permissions for all files (so they can be opened)
+find ${BACKEND_WALLET_PATH} -type f -exec chmod 644 {} +
+
+# 3. Ensure the private keys are readable by the user
+find ${BACKEND_WALLET_PATH} -name "*.key" -exec chmod 644 {} +
+
+# 4. If we are running under sudo, chown to the original user
+if [ -n "$SUDO_USER" ]; then
+    chown -R $SUDO_USER:$SUDO_USER ${BACKEND_WALLET_PATH}
+    echo "Ownership changed to user: $SUDO_USER"
+fi
+
+echo "Successfully synced all certificates to ${BACKEND_WALLET_PATH}"

@@ -12,7 +12,7 @@
     }
   },
   "channels": {
-    "mychannel": {
+    "pharma-global-channel": {
       "orderers": ["orderer.example.com"],
       "peers": {
         "peer0.vyrobca.example.com": {

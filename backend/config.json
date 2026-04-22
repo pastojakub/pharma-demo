@@ -1,5 +1,5 @@
 {
-  "channel": "mychannel",
+  "channel": "pharma-global-channel",
   "cc": "drug",
   "mspId": "VyrobcaMSP",
   "ccpPath": "./ccp.json",

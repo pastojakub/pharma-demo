@@ -1,0 +1,115 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  password      String
+  role          String         // 'manufacturer', 'regulator', 'pharmacy'
+  org           String         // MSP ID e.g. 'VyrobcaMSP'
+  notifications Notification[]
+}
+
+model DrugCatalog {
+  id                Int     @id @default(autoincrement())
+  name              String  @unique
+  composition       String  @db.Text
+  recommendedDosage String  @db.Text
+  intakeInfo        String? @db.Text
+  metadata          String? @db.Text
+  files             File[]
+}
+
+model File {
+  id             Int          @id @default(autoincrement())
+  url            String
+  name           String       // Original filename
+  type           String       // MIME type
+  size           Int
+  category       String       // 'GALLERY', 'LEAFLET', 'OTHER'
+  drugCatalogId  Int?
+  drugCatalog    DrugCatalog? @relation(fields: [drugCatalogId], references: [id])
+  orderRequestId Int?
+  orderRequest   OrderRequest? @relation(fields: [orderRequestId], references: [id])
+  createdAt      DateTime     @default(now())
+}
+
+model OrderRequest {
+  id              Int      @id @default(autoincrement())
+  requestId       String   @unique // The REQ-ID from blockchain
+  drugId          String
+  drugName        String
+  manufacturerOrg String
+  pharmacyOrg     String
+  quantity        Float
+  unit            String
+  status          String   @default("PENDING") // PENDING, OFFER_MADE, APPROVED, REJECTED, ORDERED, FULFILLED
+  rejectionReason String?  @db.Text
+  files           File[]
+  fulfillments    Fulfillment[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Fulfillment {
+  id             Int          @id @default(autoincrement())
+  orderRequestId Int
+  orderRequest   OrderRequest @relation(fields: [orderRequestId], references: [id])
+  batchID        String       // Blockchain Batch ID
+  quantity       Float
+  createdAt      DateTime     @default(now())
+}
+
+model Drug {
+  id           Int      @id @default(autoincrement())
+  batchID      String   @unique
+  drugID       String?  // Link to DrugCatalog
+  drugName     String
+  manufacturer String
+  ownerOrg     String
+  quantity     Float    @default(0)
+  unit         String   @default("ks")
+  expiryDate   String
+  status       String
+  price        Float?
+  metadata     String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  action    String
+  batchID   String?
+  userID    Int
+  timestamp DateTime @default(now())
+  details   String?  @db.Text
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  type      String   // 'URGENT_RECALL', 'INFO', 'DELIVERY'
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model PriceOffer {
+  id              Int      @id @default(autoincrement())
+  batchID         String
+  manufacturerOrg String
+  pharmacyOrg     String
+  price           Float
+  status          String   @default("PENDING")
+  createdAt       DateTime @default(now())
+}
