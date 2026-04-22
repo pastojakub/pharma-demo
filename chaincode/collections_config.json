@@ -1,0 +1,29 @@
+[
+  {
+    "name": "collectionPricing",
+    "policy": "OR('VyrobcaMSP.member', 'LekarenAMSP.member', 'LekarenBMSP.member', 'SUKLMSP.member')",
+    "requiredPeerCount": 1,
+    "maxPeerCount": 4,
+    "blockToLive": 1000000,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true
+  },
+  {
+    "name": "collectionLekarenA",
+    "policy": "OR('VyrobcaMSP.member', 'LekarenAMSP.member', 'SUKLMSP.member')",
+    "requiredPeerCount": 1,
+    "maxPeerCount": 3,
+    "blockToLive": 1000000,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true
+  },
+  {
+    "name": "collectionLekarenB",
+    "policy": "OR('VyrobcaMSP.member', 'LekarenBMSP.member', 'SUKLMSP.member')",
+    "requiredPeerCount": 1,
+    "maxPeerCount": 3,
+    "blockToLive": 1000000,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true
+  }
+]
