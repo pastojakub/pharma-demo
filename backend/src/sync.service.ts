@@ -15,6 +15,7 @@ export class SyncService implements OnModuleInit {
     this.logger.log('⏳ Starting Full Blockchain Sync...');
     this.initialSyncWithRetry();
     this.startLedgerListener();
+    this.startContractEventListener();
   }
 
   private async initialSyncWithRetry() {
@@ -24,6 +25,65 @@ export class SyncService implements OnModuleInit {
     } catch (error) {
       this.logger.error(`Initial sync failed: ${error.message}. Retrying in 15s...`);
       setTimeout(() => this.initialSyncWithRetry(), 15000);
+    }
+  }
+
+  private async startContractEventListener() {
+    try {
+      const network = await this.fabricService.getNetwork();
+      const events = await network.getChaincodeEvents(this.fabricService.getChaincodeName());
+      this.logger.log(`🔔 Contract Event Listener started for ${this.fabricService.getChaincodeName()}`);
+
+      for await (const event of events) {
+        this.logger.log(`📢 Received Contract Event: ${event.eventName}`);
+        if (event.eventName === 'EmergencyRecall') {
+          try {
+            const payload = JSON.parse(new TextDecoder().decode(event.payload));
+            await this.handleEmergencyRecall(payload);
+          } catch (e) {
+            this.logger.error(`Error processing EmergencyRecall event: ${e.message}`);
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Contract listener failed: ${error.message}. Retrying in 10s...`);
+      setTimeout(() => this.startContractEventListener(), 10000);
+    }
+  }
+
+  private async handleEmergencyRecall(payload: any) {
+    const { batchID } = payload;
+    this.logger.warn(`🚨 EMERGENCY RECALL DETECTED for batch ${batchID}`);
+
+    // Force immediate sync to update local status
+    await this.syncRecentChanges();
+
+    // Check if this organization has any involvement with this batch or its descendants
+    // We check for quantity > 0 to see if they currently have it in stock
+    const localInventory = await this.prisma.drug.findMany({
+      where: {
+        OR: [
+          { batchID: batchID },
+          { batchID: { startsWith: `${batchID}-S` } } // Catches sub-batches like B-001-S12345
+        ],
+        quantity: { gt: 0 }
+      }
+    });
+
+    const isRegulator = this.fabricService.getLocalMspId() === 'SUKLMSP';
+
+    // Only notify if they have stock or are the regulator
+    if (localInventory.length > 0 || isRegulator) {
+      const users = await this.prisma.user.findMany();
+      for (const user of users) {
+        await this.prisma.notification.create({
+          data: {
+            type: 'URGENT_RECALL',
+            message: `POZOR: Šarža ${batchID} bola stiahnutá z obehu regulačným úradom ŠÚKL! Okamžite zastavte predaj a vráťte zásoby výrobcovi.`,
+            userId: user.id,
+          },
+        });
+      }
     }
   }
 
@@ -134,7 +194,16 @@ export class SyncService implements OnModuleInit {
            for (const o of orders) {
               const order = await this.prisma.orderRequest.upsert({
                 where: { requestId: o.requestId },
-                update: { status: o.status, rejectionReason: o.rejectionReason || null },
+                update: { 
+                  status: o.status, 
+                  rejectionReason: o.rejectionReason || null,
+                  quantity: Number(o.quantity || 0),
+                  drugName: o.drugName,
+                  manufacturerOrg: o.manufacturerOrg,
+                  pharmacyOrg: o.pharmacyOrg,
+                  unit: o.unit,
+                  drugId: String(o.drugID)
+                },
                 create: {
                   requestId: o.requestId, drugId: String(o.drugID), drugName: o.drugName,
                   manufacturerOrg: o.manufacturerOrg, pharmacyOrg: o.pharmacyOrg,

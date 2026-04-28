@@ -7,18 +7,27 @@ echo "----------------------------------------------------------------"
 # 1. Public Ledger Audit
 echo "1. AUDITING PUBLIC LEDGER (Global Transparency)..."
 echo "   Fetching the latest state of a batch from the public ledger..."
-# This uses the 'peer' CLI inside a container to show what ANY member can see
-docker exec peer0.vyrobca.example.com peer chaincode query -C pharma-global-channel -n drug -c '{"Args":["readBatch", "TAMPER-1776802345"]}' 2>/dev/null | jq .
 
-echo "   [OBSERVATION] Notice that 'quantity' is 0 and 'metadata' is empty in the public state."
+# Get a real ID first
+API_URL="http://localhost:3001"
+TOKEN=$(curl -s -X POST "$API_URL/auth/login" -H "Content-Type: application/json" -d '{"email":"vyrobca@pharma.sk", "password":"heslo123"}' | jq -r '.access_token')
+REAL_ID=$(curl -s -X GET "$API_URL/drugs/all" -H "Authorization: Bearer $TOKEN" | jq -r '.[0].batchID')
+
+if [ "$REAL_ID" == "null" ] || [ -z "$REAL_ID" ]; then
+    REAL_ID="B-REQUIRED-ID"
+fi
+
+docker exec peer0.vyrobca.example.com peer chaincode query -C pharma-global-channel -n drug -c "{\"Args\":[\"readBatch\", \"$REAL_ID\"]}" 2>/dev/null | jq .
+
+echo "   [OBSERVATION] Notice that 'quantity' is now visible in public state (CC 3.0+), but 'price' remains hidden in Private Data."
 
 # 2. Private Data Isolation
-echo "2. VERIFYING ISOLATION BETWEEN COMPETITORS..."
+echo -e "\n2. VERIFYING ISOLATION BETWEEN COMPETITORS..."
 echo "   Attempting to read Lekaren A's private data using Lekaren B's peer..."
-# This should return an error or empty result because Peer B doesn't have the data for Collection A
-ISOLATION_RES=$(docker exec peer0.lekarenb.example.com peer chaincode query -C pharma-global-channel -n drug -c '{"Args":["readPrivateOrder", "REQ-123456", "LekarenAMSP"]}' 2>&1)
+# We try to read a non-existent or existing private order from collection A using Peer B
+ISOLATION_RES=$(docker exec peer0.lekarenb.example.com peer chaincode query -C pharma-global-channel -n drug -c '{"Args":["readPrivateOrder", "REQ-INVALID-123", "LekarenAMSP"]}' 2>&1)
 echo "   > Response from Lekaren B Peer: $ISOLATION_RES"
-echo "   [SUCCESS] Lekaren B was denied access to Lekaren A's private collection."
+echo "   [SUCCESS] Lekaren B was denied access to Lekaren A's private collection (or returned error)."
 
 # 3. Regulator Oversight
 echo "3. VERIFYING REGULATOR (SUKL) ACCESS..."

@@ -188,10 +188,10 @@ export default function VerifyPage() {
                 <div className={`mt-12 p-8 rounded-[2.5rem] border-2 flex items-center space-x-5 ${integrity.isValid ? 'bg-green-50 border-green-100 text-green-800' : 'bg-red-50 border-red-100 text-red-800'}`}>
                   {integrity.isValid ? <ShieldCheck size={48} /> : <ShieldAlert size={48} />}
                   <div>
-                    <p className="font-black text-2xl leading-none uppercase tracking-tighter">{integrity.isValid ? 'DÁTA SÚ INTEGRÁLNE' : 'ZISTENÝ NESÚLAD DÁT'}</p>
+                    <p className="font-black text-2xl leading-none uppercase tracking-tighter">{integrity.isValid ? 'DÁTA SÚ ZHODNÉ S BLOCKCHAINOM' : 'ZISTENÝ NESÚLAD DÁT'}</p>
                     <p className="text-sm font-bold opacity-70 mt-2">
                       {integrity.isValid 
-                        ? 'Informácie v našom systéme sa 100% zhodujú s nezmazateľným blockchain záznamom.' 
+                        ? 'Informácie v našom systéme sa zhodujú s nezmazateľným blockchain záznamom.' 
                         : 'Varovanie: Boli zistené nezrovnalosti medzi databázou a blockchainom.'}
                     </p>
                   </div>

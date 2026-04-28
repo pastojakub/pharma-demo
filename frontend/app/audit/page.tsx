@@ -4,15 +4,18 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth-provider';
 import Navbar from '../../components/Navbar';
 import api from '../../lib/api';
-import { Search, History, AlertTriangle, ShieldAlert, Clock } from 'lucide-react';
+import { Search, History, AlertTriangle, ShieldAlert, Clock, Layers } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { useToast } from '../../components/ToastProvider';
 
 function AuditContent() {
   const { user, loading } = useAuth();
+  const { showToast } = useToast();
   const searchParams = useSearchParams();
   const [batchID, setBatchID] = useState(searchParams.get('id') || '');
   const [history, setHistory] = useState<any[]>([]);
+  const [subBatches, setSubBatches] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showRecallModal, setShowRecallModal] = useState(false);
 
@@ -26,11 +29,16 @@ function AuditContent() {
   const performSearch = async (id: string) => {
     setIsSearching(true);
     try {
-      const response = await api.get(`/drugs/${id}/history`);
-      setHistory(response.data);
+      const [hRes, sRes] = await Promise.all([
+        api.get(`/drugs/${id}/history`),
+        api.get(`/drugs/${id}/sub-batches`)
+      ]);
+      setHistory(hRes.data);
+      setSubBatches(sRes.data);
     } catch (err) {
-      alert('Šarža nebola nájdená alebo nastala chyba.');
+      showToast('Šarža nebola nájdená alebo nastala chyba.', 'error');
       setHistory([]);
+      setSubBatches([]);
     } finally {
       setIsSearching(false);
     }
@@ -46,13 +54,14 @@ function AuditContent() {
   };
 
   const handleRecall = async () => {
+    const targetID = batchID;
+    setShowRecallModal(false);
     try {
-      await api.post(`/drugs/recall`, { id: batchID });
-      alert(`Šarža ${batchID} bola označená ako RECALLED v celej sieti.`);
-      setShowRecallModal(false);
-      performSearch(batchID);
+      await api.post(`/drugs/recall`, { id: targetID });
+      showToast(`Šarža ${targetID} bola úspešne stiahnutá z obehu.`, 'success');
+      performSearch(targetID);
     } catch (err) {
-      alert('Chyba pri sťahovaní šarže.');
+      showToast('Chyba pri sťahovaní šarže z obehu.', 'error');
     }
   };
 
@@ -97,6 +106,43 @@ function AuditContent() {
           </form>
         </div>
 
+        {subBatches.length > 0 && (
+          <div className="mb-16">
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-8 flex items-center">
+              <Layers className="mr-3 text-blue-500" /> Distribuované vetvy (Sub-šarže)
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {subBatches.map((sub, idx) => (
+                <div 
+                  key={idx} 
+                  onClick={() => {
+                    setBatchID(sub.batchID);
+                    performSearch(sub.batchID);
+                  }}
+                  className="bg-white p-6 rounded-[2rem] border-2 border-gray-100 hover:border-black transition-all cursor-pointer shadow-sm group"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <p className="font-mono font-black text-lg group-hover:text-black">{sub.batchID}</p>
+                    <div className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${sub.status === 'RECALLED' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
+                      {sub.status}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-gray-400 uppercase tracking-widest">Vlastník</span>
+                      <span className="text-gray-900">{sub.ownerOrg}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-gray-400 uppercase tracking-widest">Množstvo</span>
+                      <span className="text-gray-900">{sub.quantity} {sub.unit}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {history.length > 0 && (
           <div className="space-y-10">
             <div className="flex justify-between items-end border-b-2 border-gray-100 pb-8">
@@ -123,9 +169,17 @@ function AuditContent() {
                       <div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Zmena stavu</p>
                         <p className="text-2xl font-black text-gray-900">{entry.data?.status}</p>
-                        <p className="text-xs text-gray-400 flex items-center mt-3 font-bold bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 w-fit">
-                          <Clock size={14} className="mr-2" /> {new Date(entry.timestamp?.seconds * 1000).toLocaleString()}
-                        </p>
+                        <div className="flex gap-3 mt-3">
+                          <p className="text-xs text-gray-400 flex items-center font-bold bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 w-fit">
+                            <Clock size={14} className="mr-2" /> {new Date(entry.timestamp?.seconds * 1000).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-blue-600 flex items-center font-bold bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100 w-fit uppercase tracking-widest">
+                             {entry.data?.ownerOrg}
+                          </p>
+                          <p className="text-xs text-green-600 flex items-center font-bold bg-green-50 px-3 py-1.5 rounded-xl border border-green-100 w-fit">
+                             {entry.data?.quantity} {entry.data?.unit}
+                          </p>
+                        </div>
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] font-mono bg-gray-50 border border-gray-100 px-3 py-2 rounded-xl text-gray-500 font-black">

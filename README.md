@@ -27,19 +27,15 @@ The project is divided into several key components:
 
 ## 🏁 Quick Start
 
-1.  **Initialize the Blockchain Network**:
+1.  **Initialize the Blockchain Network and decentralized setup**:
+
     ```bash
     chmod +x *.sh
     ./start-full-system.sh
     ```
 
-2.  **Start the Decentralized Stack**:
-    ```bash
-    cd backend
-    docker-compose -f docker-compose-decentralized.yaml up -d --build
-    ```
+2.  **Launch the Frontend**:
 
-3.  **Launch the Frontend**:
     ```bash
     cd ../frontend
     npm install
@@ -52,12 +48,13 @@ The frontend will be available at `http://localhost:3000`.
 
 In decentralized mode, each organization has its own API endpoint:
 
-| Organization | API URL |
-| :--- | :--- |
-| **Manufacturer** | `http://localhost:3001` |
-| **Pharmacy A** | `http://localhost:3002` |
-| **Pharmacy B** | `http://localhost:3003` |
+| Organization         | API URL                 |
+| :------------------- | :---------------------- |
+| **Manufacturer**     | `http://localhost:3001` |
+| **Pharmacy A**       | `http://localhost:3002` |
+| **Pharmacy B**       | `http://localhost:3003` |
 | **Regulator (ŠÚKL)** | `http://localhost:3004` |
 
 ---
+
 Developed as a demonstration of blockchain technology in the pharmaceutical industry.

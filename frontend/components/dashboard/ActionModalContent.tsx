@@ -86,6 +86,8 @@ interface ActionModalContentProps {
 		tab?: "details" | "batches" | "pricing",
 	) => void;
 	setSelectedImage?: (url: string | null) => void;
+	targetOrg?: string;
+	setTargetOrg?: (org: string) => void;
 }
 
 export const ActionModalContent: React.FC<ActionModalContentProps> = ({
@@ -127,6 +129,8 @@ export const ActionModalContent: React.FC<ActionModalContentProps> = ({
 	pricingSummary,
 	handleAction,
 	setSelectedImage,
+	targetOrg,
+	setTargetOrg,
 }) => {
 	const canPerformAction = (batch: Batch) => {
 		const isOwner = user?.org === batch.ownerOrg;
@@ -138,25 +142,71 @@ export const ActionModalContent: React.FC<ActionModalContentProps> = ({
 
 	if (modalType === "ORDER_DETAILS" && selectedBatch) {
 		const order = selectedBatch as unknown as OrderRequest;
+		const orderIntegrity = integrity || (selectedBatch as any).integrity;
+
 		return (
 			<div className="space-y-8">
-				<div className="bg-black p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
+				<div className="bg-black p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden flex justify-between items-center">
 					<div className="absolute top-0 right-0 p-8 opacity-10">
 						<ShoppingCart size={100} />
 					</div>
-					<label className="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">
-						Identifikátor objednávky
-					</label>
-					<p className="text-4xl font-mono font-black tracking-tighter">
-						{order.requestId}
-					</p>
-					<div className="mt-6 flex items-center">
-						<StatusBadge status={order.status} />
-						<span className="ml-4 text-xs font-bold text-gray-400 uppercase tracking-widest">
-							{order.drugName}
-						</span>
+					<div className="relative z-10">
+						<label className="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">
+							Identifikátor objednávky
+						</label>
+						<p className="text-4xl font-mono font-black tracking-tighter">
+							{order.requestId}
+						</p>
+						<div className="mt-6 flex items-center">
+							<StatusBadge status={order.status} />
+							<span className="ml-4 text-xs font-bold text-gray-400 uppercase tracking-widest">
+								{order.drugName}
+							</span>
+						</div>
 					</div>
+
+					{orderIntegrity && (
+						<div
+							className={`p-4 rounded-2xl border-2 flex items-center space-x-3 z-10 ${orderIntegrity.isValid ? "bg-green-900/20 border-green-500/50 text-green-400" : "bg-red-900/20 border-red-500/50 text-red-400"}`}
+						>
+							{orderIntegrity.isValid ? (
+								<ShieldCheck size={24} />
+							) : (
+								<AlertCircle size={24} />
+							)}
+							<span className="text-[10px] font-black uppercase tracking-widest">
+								{orderIntegrity.isValid ? "Zhodné" : "Nesúlad"}
+							</span>
+						</div>
+					)}
 				</div>
+
+				{!orderIntegrity?.isValid && orderIntegrity?.mismatches && (
+					<div className="p-6 bg-red-50 border border-red-100 rounded-3xl animate-pulse-red flex justify-between items-center">
+						<div>
+							<label className="block text-[10px] font-black text-red-400 uppercase mb-2 tracking-widest">
+								Zistený nesúlad s blockchainom!
+							</label>
+							<ul className="space-y-1">
+								{orderIntegrity.mismatches.map((m: string, i: number) => (
+									<li
+										key={i}
+										className="text-xs font-bold text-red-700 flex items-center"
+									>
+										<div className="w-1.5 h-1.5 bg-red-400 rounded-full mr-2"></div>{" "}
+										{m}
+									</li>
+								))}
+							</ul>
+						</div>
+						<button
+							onClick={() => handleAction("SYNC_ORDER", selectedBatch)}
+							className="px-6 py-3 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg flex items-center"
+						>
+							<RotateCcw size={14} className="mr-2" /> Opraviť z blockchainu
+						</button>
+					</div>
+				)}
 
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 					<div className="p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100 shadow-sm">
@@ -1175,7 +1225,7 @@ export const ActionModalContent: React.FC<ActionModalContentProps> = ({
 							)}
 							<span className="text-[10px] font-black uppercase tracking-widest">
 								{selectedBatch.integrity.isValid
-									? "Integrálne"
+									? "Zhodné"
 									: "Nesúlad"}
 							</span>
 						</div>
@@ -1333,12 +1383,8 @@ export const ActionModalContent: React.FC<ActionModalContentProps> = ({
 					</label>
 					<select
 						className="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-3xl outline-none font-black appearance-none cursor-pointer focus:border-black transition-all"
-						onChange={(e) =>
-							handleAction("TRANSFER", {
-								...selectedBatch,
-								ownerOrg: e.target.value,
-							})
-						}
+						value={targetOrg}
+						onChange={(e) => setTargetOrg && setTargetOrg(e.target.value)}
 					>
 						<option value="">-- Vybrať --</option>
 						<option value="LekarenAMSP">Lekáreň A</option>
@@ -1423,27 +1469,59 @@ export const ActionModalContent: React.FC<ActionModalContentProps> = ({
 		return (
 			<div className="space-y-10">
 				<div
-					className={`p-8 rounded-[2.5rem] border-2 flex items-center space-x-5 ${integrity?.isValid ? "bg-gray-50 border-gray-200 text-black" : "bg-red-50 border-red-100 text-red-800"}`}
+					className={`p-8 rounded-[2.5rem] border-2 flex items-center justify-between space-x-5 ${integrity?.isValid ? "bg-gray-50 border-gray-200 text-black" : "bg-red-50 border-red-100 text-red-800"}`}
 				>
-					{integrity?.isValid ? (
-						<ShieldCheck size={48} />
-					) : (
-						<ShieldAlert size={48} />
-					)}
-					<div>
-						<p className="font-black text-2xl leading-none uppercase tracking-tighter">
-							{integrity?.isValid
-								? "STAV JE INTEGRÁLNY"
-								: "ZISTENÝ NESÚLAD"}
-						</p>
-						<p className="text-sm font-bold opacity-70 mt-2">
-							Dáta v DB sú v 100% zhode s blockchain ledgerom.
-						</p>
+					<div className="flex items-center space-x-5">
+						{integrity?.isValid ? (
+							<ShieldCheck size={48} />
+						) : (
+							<ShieldAlert size={48} />
+						)}
+						<div>
+							<p className="font-black text-2xl leading-none uppercase tracking-tighter">
+								{integrity?.isValid
+									? "STAV JE ZHODNÝ S BLOCKCHAINOM"
+									: "ZISTENÝ NESÚLAD"}
+							</p>
+							<p className="text-sm font-bold opacity-70 mt-2">
+								{integrity?.isValid
+									? "Dáta v lokálnej databáze sa zhodujú s blockchain ledgerom."
+									: "Zistený nesúlad údajov medzi lokálnou databázou a blockchainom!"}
+							</p>
+						</div>
 					</div>
+					{!integrity?.isValid && selectedBatch && (
+						<button
+							onClick={() => handleAction("SYNC_BATCH", selectedBatch)}
+							className="px-6 py-3 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg flex items-center"
+						>
+							<RotateCcw size={14} className="mr-2" /> Opraviť z blockchainu
+						</button>
+					)}
 				</div>
+
+				{!integrity?.isValid && integrity?.mismatches && (
+					<div className="p-6 bg-red-50 border border-red-100 rounded-3xl animate-pulse-red">
+						<label className="block text-[10px] font-black text-red-400 uppercase mb-2 tracking-widest">
+							Kritické rozdiely
+						</label>
+						<ul className="space-y-1">
+							{integrity.mismatches.map((m: string, i: number) => (
+								<li
+									key={i}
+									className="text-xs font-bold text-red-700 flex items-center"
+								>
+									<div className="w-1.5 h-1.5 bg-red-400 rounded-full mr-2"></div>{" "}
+									{m}
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
+
 				<div className="relative space-y-10 before:absolute before:left-8 before:top-2 before:bottom-2 before:w-1.5 before:bg-gray-100 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar">
 					{history.map((tx, i) => (
-						<div key={tx.txId} className="relative pl-20 pb-2">
+						<div key={`${tx.txId}-${i}`} className="relative pl-20 pb-2">
 							<div className="absolute left-5 top-2 w-7 h-7 bg-white border-4 border-black rounded-full z-10 shadow-md"></div>
 							<div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
 								<div className="flex justify-between items-start mb-6">

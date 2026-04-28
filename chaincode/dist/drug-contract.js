@@ -14,12 +14,12 @@ const fabric_contract_api_1 = require("fabric-contract-api");
 let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
     getCollectionName(ctx, pharmacyMsp) {
         const mspId = (pharmacyMsp || ctx.clientIdentity.getMSPID()).trim();
-        if (mspId === 'LekarenAMSP')
-            return 'collectionLekarenA';
-        if (mspId === 'LekarenBMSP')
-            return 'collectionLekarenB';
-        if (mspId === 'VyrobcaMSP')
-            return 'collectionPricing';
+        if (mspId === "LekarenAMSP")
+            return "collectionLekarenA";
+        if (mspId === "LekarenBMSP")
+            return "collectionLekarenB";
+        if (mspId === "VyrobcaMSP")
+            return "collectionPricing";
         throw new Error(`MSP ID ${mspId} nemá priradenú žiadnu súkromnú kolekciu.`);
     }
     getTransientValue(ctx, key) {
@@ -31,16 +31,23 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
     }
     async addToRegistry(ctx, registryKey, id, collection) {
         let registryBytes;
-        if (collection) {
-            registryBytes = await ctx.stub.getPrivateData(collection, registryKey);
+        try {
+            if (collection) {
+                registryBytes = await ctx.stub.getPrivateData(collection, registryKey);
+            }
+            else {
+                registryBytes = await ctx.stub.getState(registryKey);
+            }
         }
-        else {
-            registryBytes = await ctx.stub.getState(registryKey);
+        catch (e) {
+            // If we can't read the registry, we'll assume it's broken or missing and start fresh
+            registryBytes = Buffer.from("[]");
         }
         let registry = [];
         if (registryBytes && registryBytes.length > 0) {
             try {
-                registry = JSON.parse(registryBytes.toString());
+                const str = registryBytes.toString();
+                registry = JSON.parse(str === "" ? "[]" : str);
             }
             catch (e) {
                 registry = [];
@@ -60,122 +67,169 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
         ctx.stub.setEvent(name, Buffer.from(JSON.stringify(payload)));
     }
     async addDrugDefinition(ctx, id, name, composition, dosage, intake, meta, leafletJSON, galleryJSON) {
-        if (ctx.clientIdentity.getMSPID() !== 'VyrobcaMSP') {
-            throw new Error('Iba výrobca môže pridávať definície liekov.');
+        if (ctx.clientIdentity.getMSPID() !== "VyrobcaMSP") {
+            throw new Error("Iba výrobca môže pridávať definície liekov.");
         }
         const drug = {
-            id, name, composition, recommendedDosage: dosage,
-            intakeInfo: intake, metadata: meta,
+            id,
+            name,
+            composition,
+            recommendedDosage: dosage,
+            intakeInfo: intake,
+            metadata: meta,
             leaflet: JSON.parse(leafletJSON),
             gallery: JSON.parse(galleryJSON),
             manufacturer: ctx.clientIdentity.getMSPID(),
-            createdAt: ctx.stub.getTxTimestamp().seconds.toString()
+            createdAt: ctx.stub.getTxTimestamp().seconds.toString(),
         };
         const key = `DEF_${id}`;
         await ctx.stub.putState(key, Buffer.from(JSON.stringify(drug)));
-        await this.addToRegistry(ctx, 'REGISTRY_DEFINITIONS', key);
-        this.emitEvent(ctx, 'DrugDefinitionAdded', { id, name });
+        await this.addToRegistry(ctx, "REGISTRY_DEFINITIONS", key);
+        this.emitEvent(ctx, "DrugDefinitionAdded", { id, name });
     }
     async initBatch(ctx, batchID, drugID, drugName, manufacturer, expiryDate, unit) {
-        if (ctx.clientIdentity.getMSPID() !== 'VyrobcaMSP') {
-            throw new Error('Len výrobca môže vytvoriť novú šaržu.');
+        if (ctx.clientIdentity.getMSPID() !== "VyrobcaMSP") {
+            throw new Error("Len výrobca môže vytvoriť novú šaržu.");
         }
-        const price = Number(this.getTransientValue(ctx, 'price'));
-        const quantity = Number(this.getTransientValue(ctx, 'quantity'));
-        const metadata = this.getTransientValue(ctx, 'metadata');
+        const price = Number(this.getTransientValue(ctx, "price"));
+        const quantity = Number(this.getTransientValue(ctx, "quantity"));
+        const metadata = this.getTransientValue(ctx, "metadata");
         const drugBatch = {
-            batchID, drugID, drugName, manufacturer,
+            batchID,
+            drugID,
+            drugName,
+            manufacturer,
             ownerOrg: ctx.clientIdentity.getMSPID(),
             quantity,
-            unit, expiryDate, status: 'INITIALIZED'
+            unit,
+            expiryDate,
+            status: "INITIALIZED",
         };
         await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(drugBatch)));
-        await this.addToRegistry(ctx, 'REGISTRY_BATCHES', batchID);
+        await this.addToRegistry(ctx, "REGISTRY_BATCHES", batchID);
         const collection = this.getCollectionName(ctx);
-        const privateData = { batchID, price, quantity, metadata };
+        const privateData = {
+            batchID,
+            price,
+            quantity,
+            metadata,
+        };
         await ctx.stub.putPrivateData(collection, batchID, Buffer.from(JSON.stringify(privateData)));
-        await this.addToRegistry(ctx, 'REGISTRY_MY_BATCHES', batchID, collection);
-        this.emitEvent(ctx, 'BatchCreated', { batchID, drugID, drugName });
+        await this.addToRegistry(ctx, "REGISTRY_MY_BATCHES", batchID, collection);
+        this.emitEvent(ctx, "BatchCreated", { batchID, drugID, drugName });
     }
     async requestDrug(ctx, requestID, drugID, drugName, manufacturerOrg, unit, fileAttachmentsJSON) {
         const pharmacyMsp = ctx.clientIdentity.getMSPID();
-        if (!pharmacyMsp.startsWith('Lekaren')) {
-            throw new Error('Iba lekárne môžu odosielať požiadavky.');
+        if (!pharmacyMsp.startsWith("Lekaren")) {
+            throw new Error("Iba lekárne môžu odosielať požiadavky.");
         }
-        const quantity = Number(this.getTransientValue(ctx, 'quantity'));
+        const quantity = Number(this.getTransientValue(ctx, "quantity"));
         const collection = this.getCollectionName(ctx, pharmacyMsp);
         const order = {
-            requestId: requestID, drugID, drugName, manufacturerOrg, pharmacyOrg: pharmacyMsp,
-            quantity, unit, status: 'REQUESTED',
+            requestId: requestID,
+            drugID,
+            drugName,
+            manufacturerOrg,
+            pharmacyOrg: pharmacyMsp,
+            quantity,
+            unit,
+            status: "REQUESTED",
             createdAt: ctx.stub.getTxTimestamp().seconds.toString(),
             fileAttachments: JSON.parse(fileAttachmentsJSON),
-            priceOffers: [], fulfillments: []
+            priceOffers: [],
+            fulfillments: [],
         };
         await ctx.stub.putPrivateData(collection, requestID, Buffer.from(JSON.stringify(order)));
-        await this.addToRegistry(ctx, 'REGISTRY_ORDERS', requestID, collection);
-        this.emitEvent(ctx, 'OrderRequested', { requestID, pharmacyMsp, drugName });
+        await this.addToRegistry(ctx, "REGISTRY_ORDERS", requestID, collection);
+        this.emitEvent(ctx, "OrderRequested", {
+            requestID,
+            pharmacyMsp,
+            drugName,
+        });
     }
     async providePriceOffer(ctx, requestID, pharmacyMsp) {
-        if (ctx.clientIdentity.getMSPID() !== 'VyrobcaMSP') {
-            throw new Error('Iba výrobca môže poskytnúť cenovú ponuku.');
+        if (ctx.clientIdentity.getMSPID() !== "VyrobcaMSP") {
+            throw new Error("Iba výrobca môže poskytnúť cenovú ponuku.");
         }
-        const price = Number(this.getTransientValue(ctx, 'price'));
+        const price = Number(this.getTransientValue(ctx, "price"));
         const collection = this.getCollectionName(ctx, pharmacyMsp);
         const orderJSON = await ctx.stub.getPrivateData(collection, requestID);
         if (!orderJSON || orderJSON.length === 0)
-            throw new Error('Požiadavka nenájdená.');
+            throw new Error("Požiadavka nenájdená.");
         const order = JSON.parse(orderJSON.toString());
-        order.status = 'OFFER_MADE';
+        order.status = "OFFER_MADE";
         order.priceOffer = price;
-        order.priceOffers.push({ price, timestamp: ctx.stub.getTxTimestamp().seconds.toString() });
+        order.priceOffers.push({
+            price,
+            timestamp: ctx.stub.getTxTimestamp().seconds.toString(),
+        });
         await ctx.stub.putPrivateData(collection, requestID, Buffer.from(JSON.stringify(order)));
-        this.emitEvent(ctx, 'PriceOfferProvided', { requestID, pharmacyMsp });
+        this.emitEvent(ctx, "PriceOfferProvided", { requestID, pharmacyMsp });
     }
     async finalizeAgreement(ctx, requestID) {
         const pharmacyMsp = ctx.clientIdentity.getMSPID();
         const collection = this.getCollectionName(ctx, pharmacyMsp);
-        const price = Number(this.getTransientValue(ctx, 'price'));
+        const price = Number(this.getTransientValue(ctx, "price"));
         const orderJSON = await ctx.stub.getPrivateData(collection, requestID);
         if (!orderJSON || orderJSON.length === 0)
-            throw new Error('Požiadavka neexistuje.');
+            throw new Error("Požiadavka neexistuje.");
         const order = JSON.parse(orderJSON.toString());
-        order.status = 'APPROVED';
+        order.status = "APPROVED";
         order.finalAgreedPrice = price;
         await ctx.stub.putPrivateData(collection, requestID, Buffer.from(JSON.stringify(order)));
-        this.emitEvent(ctx, 'AgreementFinalized', { requestID, pharmacyMsp });
+        this.emitEvent(ctx, "AgreementFinalized", { requestID, pharmacyMsp });
     }
-    async transferOwnership(ctx, batchID, newOwnerOrg, requestID) {
+    async checkRecallStatus(ctx, batchID) {
+        let currentID = batchID;
+        const visited = new Set();
+        while (currentID && !visited.has(currentID)) {
+            visited.add(currentID);
+            const batchJSON = await ctx.stub.getState(currentID);
+            if (!batchJSON || batchJSON.length === 0)
+                break;
+            const batch = JSON.parse(batchJSON.toString());
+            if (batch.status === "RECALLED") {
+                throw new Error(`Operácia zamietnutá: Šarža ${batchID} (alebo jej predok ${currentID}) je stiahnutá z obehu!`);
+            }
+            currentID = batch.parentBatchID || "";
+        }
+    }
+    async transferOwnership(ctx, batchID, newOwnerOrg, requestID = "") {
         const mspId = ctx.clientIdentity.getMSPID();
         const collection = this.getCollectionName(ctx, mspId);
-        const qSent = Number(this.getTransientValue(ctx, 'quantity'));
+        const qSent = Number(this.getTransientValue(ctx, "quantity"));
         let price;
         try {
-            price = Number(this.getTransientValue(ctx, 'price'));
+            price = Number(this.getTransientValue(ctx, "price"));
         }
         catch (e) { }
+        await this.checkRecallStatus(ctx, batchID);
         const batchJSON = await ctx.stub.getState(batchID);
         if (!batchJSON || batchJSON.length === 0)
-            throw new Error('Šarža nenájdená.');
+            throw new Error("Šarža nenájdená.");
         const batch = JSON.parse(batchJSON.toString());
         if (batch.ownerOrg !== mspId)
-            throw new Error('Nie ste vlastníkom šarže.');
+            throw new Error("Nie ste vlastníkom šarže.");
+        if (batch.ownerOrg === newOwnerOrg) {
+            throw new Error("Nový vlastník musí byť iný ako súčasný.");
+        }
         const privJSON = await ctx.stub.getPrivateData(collection, batchID);
         if (!privJSON || privJSON.length === 0)
-            throw new Error('Súkromné dáta nenájdené.');
+            throw new Error("Súkromné dáta nenájdené.");
         const priv = JSON.parse(privJSON.toString());
         if (qSent > priv.quantity)
-            throw new Error('Nedostatok zásob.');
+            throw new Error("Nedostatok zásob.");
         const effectivePrice = price !== undefined ? price : priv.price;
         // Ak ide o fulfillment objednávky, zaznamenáme to on-chain
         if (requestID) {
-            const orderCol = this.getCollectionName(ctx, newOwnerOrg.startsWith('Lekaren') ? newOwnerOrg : mspId);
+            const orderCol = this.getCollectionName(ctx, newOwnerOrg.startsWith("Lekaren") ? newOwnerOrg : mspId);
             const orderJSON = await ctx.stub.getPrivateData(orderCol, requestID);
             if (orderJSON && orderJSON.length > 0) {
                 const order = JSON.parse(orderJSON.toString());
                 order.fulfillments.push({
                     batchID: batchID,
                     quantity: qSent,
-                    timestamp: ctx.stub.getTxTimestamp().seconds.toString()
+                    timestamp: ctx.stub.getTxTimestamp().seconds.toString(),
                 });
                 await ctx.stub.putPrivateData(orderCol, requestID, Buffer.from(JSON.stringify(order)));
             }
@@ -193,48 +247,64 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
                 batchID: newID,
                 ownerOrg: newOwnerOrg,
                 quantity: qSent,
-                status: 'IN_TRANSIT',
-                parentBatchID: batchID
+                status: "IN_TRANSIT",
+                parentBatchID: batchID,
             };
             await ctx.stub.putState(newID, Buffer.from(JSON.stringify(newBatch)));
-            await this.addToRegistry(ctx, 'REGISTRY_BATCHES', newID);
+            await this.addToRegistry(ctx, "REGISTRY_BATCHES", newID);
             const targetCol = this.getCollectionName(ctx, newOwnerOrg);
-            const targetPriv = { batchID: newID, price: effectivePrice, quantity: qSent, metadata: priv.metadata };
+            const targetPriv = {
+                batchID: newID,
+                price: effectivePrice,
+                quantity: qSent,
+                metadata: priv.metadata,
+            };
             await ctx.stub.putPrivateData(targetCol, newID, Buffer.from(JSON.stringify(targetPriv)));
-            await this.addToRegistry(ctx, 'REGISTRY_MY_BATCHES', newID, targetCol);
+            await this.addToRegistry(ctx, "REGISTRY_MY_BATCHES", newID, targetCol);
             resultingBatchID = newID;
         }
         else {
             batch.ownerOrg = newOwnerOrg;
-            batch.status = 'IN_TRANSIT';
+            batch.status = "IN_TRANSIT";
             batch.quantity = qSent;
             await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(batch)));
             await ctx.stub.deletePrivateData(collection, batchID);
             const targetCol = this.getCollectionName(ctx, newOwnerOrg);
-            const targetPriv = { batchID: batchID, price: effectivePrice, quantity: qSent, metadata: priv.metadata };
+            const targetPriv = {
+                batchID: batchID,
+                price: effectivePrice,
+                quantity: qSent,
+                metadata: priv.metadata,
+            };
             await ctx.stub.putPrivateData(targetCol, batchID, Buffer.from(JSON.stringify(targetPriv)));
-            await this.addToRegistry(ctx, 'REGISTRY_MY_BATCHES', batchID, targetCol);
+            await this.addToRegistry(ctx, "REGISTRY_MY_BATCHES", batchID, targetCol);
             resultingBatchID = batchID;
         }
-        this.emitEvent(ctx, 'BatchTransferred', { batchID: resultingBatchID, from: mspId, to: newOwnerOrg });
+        this.emitEvent(ctx, "BatchTransferred", {
+            batchID: resultingBatchID,
+            from: mspId,
+            to: newOwnerOrg,
+        });
         return resultingBatchID;
     }
     async confirmDelivery(ctx, batchID) {
         const mspId = ctx.clientIdentity.getMSPID();
+        await this.checkRecallStatus(ctx, batchID);
         const batchJSON = await ctx.stub.getState(batchID);
         if (!batchJSON || batchJSON.length === 0)
-            throw new Error('Šarža nenájdená.');
+            throw new Error("Šarža nenájdená.");
         const batch = JSON.parse(batchJSON.toString());
         if (batch.ownerOrg !== mspId)
-            throw new Error('Nie ste vlastníkom tejto šarže.');
-        batch.status = 'DELIVERED';
+            throw new Error("Nie ste vlastníkom tejto šarže.");
+        batch.status = "DELIVERED";
         await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(batch)));
-        this.emitEvent(ctx, 'BatchDelivered', { batchID, owner: mspId });
+        this.emitEvent(ctx, "BatchDelivered", { batchID, owner: mspId });
     }
     async sellToConsumer(ctx, batchID) {
         const mspId = ctx.clientIdentity.getMSPID();
-        const qSold = Number(this.getTransientValue(ctx, 'quantity'));
+        const qSold = Number(this.getTransientValue(ctx, "quantity"));
         const collection = this.getCollectionName(ctx, mspId);
+        await this.checkRecallStatus(ctx, batchID);
         const batchJSON = await ctx.stub.getState(batchID);
         if (!batchJSON || batchJSON.length === 0)
             throw new Error(`Šarža ${batchID} nenájdená.`);
@@ -250,65 +320,99 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
         priv.quantity -= qSold;
         batch.quantity = priv.quantity;
         if (priv.quantity === 0) {
-            batch.status = 'SOLD';
-            batch.ownerOrg = 'CONSUMER';
+            batch.status = "SOLD";
+            batch.ownerOrg = "CONSUMER";
         }
         // Always update both states to ensure sync works correctly
         await ctx.stub.putPrivateData(collection, batchID, Buffer.from(JSON.stringify(priv)));
         await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(batch)));
-        this.emitEvent(ctx, 'DrugSold', { batchID, quantity: qSold });
+        this.emitEvent(ctx, "DrugSold", { batchID, quantity: qSold });
     }
     async returnToManufacturer(ctx, batchID, manufacturerOrg) {
         const mspId = ctx.clientIdentity.getMSPID();
         const collection = this.getCollectionName(ctx, mspId);
         const batchJSON = await ctx.stub.getState(batchID);
         if (!batchJSON || batchJSON.length === 0)
-            throw new Error('Šarža nenájdená.');
+            throw new Error("Šarža nenájdená.");
         const batch = JSON.parse(batchJSON.toString());
+        if (batch.status === "RECALLED") {
+            throw new Error(`Šarža ${batchID} je stiahnutá z obehu (RECALLED) a táto operácia nie je povolená!`);
+        }
         if (batch.ownerOrg !== mspId)
-            throw new Error('Iba aktuálny vlastník môže vrátiť šaržu.');
+            throw new Error("Iba aktuálny vlastník môže vrátiť šaržu.");
         const privJSON = await ctx.stub.getPrivateData(collection, batchID);
         if (!privJSON || privJSON.length === 0)
-            throw new Error('Súkromné dáta nenájdené.');
+            throw new Error("Súkromné dáta nenájdené.");
         const priv = JSON.parse(privJSON.toString());
         batch.ownerOrg = manufacturerOrg;
-        batch.status = 'RETURNED';
+        batch.status = "RETURNED";
         await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(batch)));
         await ctx.stub.deletePrivateData(collection, batchID);
         const targetCol = this.getCollectionName(ctx, manufacturerOrg);
         await ctx.stub.putPrivateData(targetCol, batchID, Buffer.from(JSON.stringify(priv)));
-        this.emitEvent(ctx, 'BatchReturned', { batchID, from: mspId, to: manufacturerOrg });
+        this.emitEvent(ctx, "BatchReturned", {
+            batchID,
+            from: mspId,
+            to: manufacturerOrg,
+        });
     }
     async emergencyRecall(ctx, batchID) {
-        if (ctx.clientIdentity.getMSPID() !== 'SUKLMSP') {
-            throw new Error('Iba regulátor (ŠÚKL) môže vyhlásiť sťahovanie z trhu.');
+        if (ctx.clientIdentity.getMSPID() !== "SUKLMSP") {
+            throw new Error("Iba regulátor (ŠÚKL) môže vyhlásiť sťahovanie z trhu.");
         }
-        const batchJSON = await ctx.stub.getState(batchID);
-        if (!batchJSON || batchJSON.length === 0)
-            throw new Error('Šarža nenájdená.');
-        const batch = JSON.parse(batchJSON.toString());
-        batch.status = 'RECALLED';
-        await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(batch)));
-        this.emitEvent(ctx, 'EmergencyRecall', { batchID });
+        // Fetch all batches to build a complete map for recursion
+        const registryBytes = await ctx.stub.getState("REGISTRY_BATCHES");
+        if (!registryBytes || registryBytes.length === 0) {
+            throw new Error("Neboli nájdené žiadne šarže v registri.");
+        }
+        const keys = JSON.parse(registryBytes.toString());
+        const allBatches = [];
+        for (const key of keys) {
+            const val = await ctx.stub.getState(key);
+            if (val && val.length > 0) {
+                allBatches.push(JSON.parse(val.toString()));
+            }
+        }
+        // Start recursive update starting from the target batch
+        await this.recursiveRecallHelper(ctx, batchID, allBatches);
+    }
+    async recursiveRecallHelper(ctx, batchID, allBatches) {
+        const batch = allBatches.find((b) => b.batchID === batchID);
+        if (!batch)
+            return;
+        // 1. Update the current batch status if not already recalled
+        if (batch.status !== "RECALLED") {
+            batch.status = "RECALLED";
+            await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(batch)));
+            // Emit event so backends can sync immediately
+            this.emitEvent(ctx, "EmergencyRecall", { batchID });
+        }
+        // 2. Find all direct children of this batch
+        const children = allBatches.filter((b) => b.parentBatchID === batchID);
+        // 3. Recursively recall each child
+        for (const child of children) {
+            await this.recursiveRecallHelper(ctx, child.batchID, allBatches);
+        }
     }
     async rejectRequest(ctx, requestID, pharmacyMsp, reason) {
         const mspId = ctx.clientIdentity.getMSPID();
-        if (mspId !== 'VyrobcaMSP' && mspId !== pharmacyMsp)
-            throw new Error('Nedostatočné oprávnenia.');
+        if (mspId !== "VyrobcaMSP" && mspId !== pharmacyMsp)
+            throw new Error("Nedostatočné oprávnenia.");
         const collection = this.getCollectionName(ctx, pharmacyMsp);
         const orderJSON = await ctx.stub.getPrivateData(collection, requestID);
         if (!orderJSON || orderJSON.length === 0)
-            throw new Error('Požiadavka neexistuje.');
+            throw new Error("Požiadavka neexistuje.");
         const order = JSON.parse(orderJSON.toString());
-        order.status = 'REJECTED';
+        order.status = "REJECTED";
         order.rejectionReason = reason;
         await ctx.stub.putPrivateData(collection, requestID, Buffer.from(JSON.stringify(order)));
-        this.emitEvent(ctx, 'RequestRejected', { requestID, pharmacyMsp });
+        this.emitEvent(ctx, "RequestRejected", { requestID, pharmacyMsp });
     }
     async queryHistory(ctx, batchID) {
         const allResults = [];
         let currentID = batchID;
         const processedIDs = new Set();
+        const processedTxIDs = new Set();
         while (currentID && !processedIDs.has(currentID)) {
             processedIDs.add(currentID);
             const historyIterator = await ctx.stub.getHistoryForKey(currentID);
@@ -316,23 +420,30 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
             let parentID = undefined;
             while (!res.done) {
                 if (res.value) {
+                    if (processedTxIDs.has(res.value.txId)) {
+                        res = await historyIterator.next();
+                        continue;
+                    }
+                    processedTxIDs.add(res.value.txId);
                     const jsonRes = {};
                     jsonRes.txId = res.value.txId;
                     const ts = res.value.timestamp;
                     jsonRes.timestamp = {
-                        seconds: ts.seconds?.low || ts.seconds || 0,
-                        nanos: ts.nanos || 0
+                        seconds: ts.seconds?.low ||
+                            ts.seconds ||
+                            0,
+                        nanos: ts.nanos || 0,
                     };
                     jsonRes.isDelete = res.value.isDelete;
                     try {
-                        const data = JSON.parse(res.value.value.toString('utf8'));
+                        const data = JSON.parse(res.value.value.toString());
                         jsonRes.data = data;
                         if (data.parentBatchID && !parentID) {
                             parentID = data.parentBatchID;
                         }
                     }
                     catch (err) {
-                        jsonRes.data = res.value.value.toString('utf8');
+                        jsonRes.data = res.value.value.toString();
                     }
                     allResults.push(jsonRes);
                 }
@@ -343,7 +454,7 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
                 currentID = parentID;
             }
             else {
-                currentID = '';
+                currentID = "";
             }
         }
         allResults.sort((a, b) => {
@@ -352,6 +463,23 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
             return timeB - timeA;
         });
         return JSON.stringify(allResults);
+    }
+    async querySubBatches(ctx, batchID) {
+        const registryBytes = await ctx.stub.getState("REGISTRY_BATCHES");
+        if (!registryBytes || registryBytes.length === 0)
+            return JSON.stringify([]);
+        const keys = JSON.parse(registryBytes.toString());
+        const subBatches = [];
+        for (const key of keys) {
+            const val = await ctx.stub.getState(key);
+            if (val && val.length > 0) {
+                const batch = JSON.parse(val.toString());
+                if (batch.parentBatchID === batchID) {
+                    subBatches.push(batch);
+                }
+            }
+        }
+        return JSON.stringify(subBatches);
     }
     async readDrugDefinition(ctx, id) {
         return await ctx.stub.getState(`DEF_${id}`);
@@ -364,7 +492,7 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
         return await ctx.stub.getPrivateData(collection, requestID);
     }
     async GetAllDrugDefinitions(ctx) {
-        const registryBytes = await ctx.stub.getState('REGISTRY_DEFINITIONS');
+        const registryBytes = await ctx.stub.getState("REGISTRY_DEFINITIONS");
         if (!registryBytes || registryBytes.length === 0)
             return JSON.stringify([]);
         const keys = JSON.parse(registryBytes.toString());
@@ -377,7 +505,7 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
         return JSON.stringify(results);
     }
     async GetAllDrugs(ctx) {
-        const registryBytes = await ctx.stub.getState('REGISTRY_BATCHES');
+        const registryBytes = await ctx.stub.getState("REGISTRY_BATCHES");
         if (!registryBytes || registryBytes.length === 0)
             return JSON.stringify([]);
         const keys = JSON.parse(registryBytes.toString());
@@ -391,7 +519,7 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
     }
     async queryPrivateOrders(ctx, pharmacyMsp) {
         const collection = this.getCollectionName(ctx, pharmacyMsp);
-        const registryBytes = await ctx.stub.getPrivateData(collection, 'REGISTRY_ORDERS');
+        const registryBytes = await ctx.stub.getPrivateData(collection, "REGISTRY_ORDERS");
         if (!registryBytes || registryBytes.length === 0)
             return JSON.stringify([]);
         const keys = JSON.parse(registryBytes.toString());
@@ -411,7 +539,7 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
             const collection = this.getCollectionName(ctx);
             const privJSON = await ctx.stub.getPrivateData(collection, batchID);
             if (!privJSON || privJSON.length === 0)
-                return JSON.stringify({ error: 'Data not available' });
+                return JSON.stringify({ error: "Data not available" });
             return privJSON.toString();
         }
         catch (e) {
@@ -494,6 +622,13 @@ __decorate([
 ], DrugContract.prototype, "queryHistory", null);
 __decorate([
     (0, fabric_contract_api_1.Transaction)(false),
+    (0, fabric_contract_api_1.Returns)("string"),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [fabric_contract_api_1.Context, String]),
+    __metadata("design:returntype", Promise)
+], DrugContract.prototype, "querySubBatches", null);
+__decorate([
+    (0, fabric_contract_api_1.Transaction)(false),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [fabric_contract_api_1.Context, String]),
     __metadata("design:returntype", Promise)
@@ -512,21 +647,21 @@ __decorate([
 ], DrugContract.prototype, "readPrivateOrder", null);
 __decorate([
     (0, fabric_contract_api_1.Transaction)(false),
-    (0, fabric_contract_api_1.Returns)('string'),
+    (0, fabric_contract_api_1.Returns)("string"),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [fabric_contract_api_1.Context]),
     __metadata("design:returntype", Promise)
 ], DrugContract.prototype, "GetAllDrugDefinitions", null);
 __decorate([
     (0, fabric_contract_api_1.Transaction)(false),
-    (0, fabric_contract_api_1.Returns)('string'),
+    (0, fabric_contract_api_1.Returns)("string"),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [fabric_contract_api_1.Context]),
     __metadata("design:returntype", Promise)
 ], DrugContract.prototype, "GetAllDrugs", null);
 __decorate([
     (0, fabric_contract_api_1.Transaction)(false),
-    (0, fabric_contract_api_1.Returns)('string'),
+    (0, fabric_contract_api_1.Returns)("string"),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [fabric_contract_api_1.Context, String]),
     __metadata("design:returntype", Promise)
@@ -539,12 +674,15 @@ __decorate([
 ], DrugContract.prototype, "RegisterExistingKey", null);
 __decorate([
     (0, fabric_contract_api_1.Transaction)(false),
-    (0, fabric_contract_api_1.Returns)('string'),
+    (0, fabric_contract_api_1.Returns)("string"),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [fabric_contract_api_1.Context, String]),
     __metadata("design:returntype", Promise)
 ], DrugContract.prototype, "getBatchPrice", null);
 exports.DrugContract = DrugContract = __decorate([
-    (0, fabric_contract_api_1.Info)({ title: 'DrugContract', description: 'Smart kontrakt pre sledovanie šarží liečiv' })
+    (0, fabric_contract_api_1.Info)({
+        title: "DrugContract",
+        description: "Smart kontrakt pre sledovanie šarží liečiv",
+    })
 ], DrugContract);
 //# sourceMappingURL=drug-contract.js.map

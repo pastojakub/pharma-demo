@@ -158,6 +158,10 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
     return this.mspId;
   }
 
+  public getChaincodeName(): string {
+    return this.configService.get<string>('FABRIC_CHAINCODE') || this.config?.cc || 'drug-traceability';
+  }
+
   async executeTransaction(name: string, args: string[], userID: number, isQuery = false, transientData?: Record<string, Uint8Array>): Promise<any> {
     const contract = await this.getContract();
     try {
@@ -167,11 +171,12 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
       } else {
         const proposal = contract.newProposal(name, { arguments: args, transientData });
         const transaction = await proposal.endorse();
-        const submittedTransaction = await transaction.submit();
-        const resultBytes = submittedTransaction.getResult();
+        const resultBytes = transaction.getResult();
+        const commit = await transaction.submit();
+        
         const result = this.decodeResult(resultBytes);
 
-        const status = await submittedTransaction.getStatus();
+        const status = await commit.getStatus();
         if (!status.successful) throw new Error(`Transaction failed with status code ${status.code}`);
 
         if (userID) await this.createAuditLog(name, args[0], userID, args);
@@ -270,8 +275,7 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
   async transferOwnership(uID: number, bID: string, nOrg: string, q: number, price?: number, requestID?: string) {
     const transient: any = { quantity: Buffer.from(q.toString()) };
     if (price) transient.price = Buffer.from(price.toString());
-    const args = [bID, nOrg];
-    if (requestID) args.push(requestID);
+    const args = [bID, nOrg, requestID || ''];
     return this.executeTransaction('transferOwnership', args, uID, false, transient);
   }
 
@@ -317,6 +321,10 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
      return results;
   }
 
+  async querySubBatches(bID: string) {
+    return this.executeTransaction('querySubBatches', [bID], 1, true);
+  }
+
   // Restore missing public API methods
   async getAllDrugs(user: any) {
     if (user.role === 'regulator') return await this.prisma.drug.findMany({ orderBy: { createdAt: 'desc' } });
@@ -351,9 +359,31 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
   async verifyOrderIntegrity(requestId: string, mspId: string, userID: number) {
     const db = await this.prisma.orderRequest.findUnique({ where: { requestId } });
     if (!db) return { isValid: false, message: 'Objednávka nebola nájdená v databáze.' };
+    
     const bc = await this.readPrivateOrder(requestId, userID, db.pharmacyOrg);
     if (!bc) return { isValid: false, message: 'Blockchain dáta nedostupné.', db };
-    return { isValid: true, db, bc };
+
+    const mismatches: string[] = [];
+    if (Number(db.quantity) !== Number(bc.quantity)) {
+      mismatches.push(`Množstvo: DB(${db.quantity}) vs BC(${bc.quantity})`);
+    }
+    if (db.drugName !== bc.drugName) {
+      mismatches.push(`Názov lieku: DB(${db.drugName}) vs BC(${bc.drugName})`);
+    }
+    if (db.status !== bc.status) {
+      mismatches.push(`Stav: DB(${db.status}) vs BC(${bc.status})`);
+    }
+    if (db.manufacturerOrg !== bc.manufacturerOrg) {
+      mismatches.push(`Výrobca: DB(${db.manufacturerOrg}) vs BC(${bc.manufacturerOrg})`);
+    }
+
+    return { 
+      isValid: mismatches.length === 0, 
+      message: mismatches.length === 0 ? 'Dáta sú zhodné s blockchainom.' : 'Zistený nesúlad údajov!',
+      mismatches,
+      db, 
+      bc 
+    };
   }
 
   async syncDrugWithDB(batchID: string, mspId: string) {
@@ -406,12 +436,113 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
   async verifyIntegrity(batchID: string, mspId?: string) {
     const db = await this.prisma.drug.findUnique({ where: { batchID } });
     if (!db) return { isValid: false, message: 'Nenájdené v DB', mismatches: [] };
+
     const bc = await this.executeTransaction('readBatch', [batchID], 1, true);
     if (!bc) return { isValid: false, message: 'Blockchain dáta nedostupné', mismatches: [] };
-    
+
     const mismatches: string[] = [];
-    if (String(db.status) !== String(bc.status)) mismatches.push(`Stav: DB(${db.status}) vs BC(${bc.status})`);
-    
-    return { isValid: mismatches.length === 0, db, bc, mismatches }; 
+    if (String(db.status) !== String(bc.status)) {
+      mismatches.push(`Stav: DB(${db.status}) vs BC(${bc.status})`);
+    }
+    if (Number(db.quantity) !== Number(bc.quantity)) {
+      mismatches.push(`Množstvo: DB(${db.quantity}) vs BC(${bc.quantity})`);
+    }
+    if (db.drugName !== bc.drugName) {
+      mismatches.push(`Názov: DB(${db.drugName}) vs BC(${bc.drugName})`);
+    }
+    if (db.ownerOrg !== bc.ownerOrg) {
+      mismatches.push(`Vlastník: DB(${db.ownerOrg}) vs BC(${bc.ownerOrg})`);
+    }
+
+    return { 
+      isValid: mismatches.length === 0, 
+      message: mismatches.length === 0 ? 'Dáta sú zhodné s blockchainom.' : 'Zistený nesúlad údajov!',
+      db, 
+      bc, 
+      mismatches 
+    }; 
   }
+
+  async syncOrderWithDB(requestId: string, userID: number) {
+    const dbOrder = await this.prisma.orderRequest.findUnique({ where: { requestId } });
+    if (!dbOrder) return;
+
+    try {
+      const o = await this.readPrivateOrder(requestId, userID, dbOrder.pharmacyOrg);
+      if (!o) return;
+
+      const order = await this.prisma.orderRequest.update({
+        where: { requestId: o.requestId },
+        data: { 
+          status: o.status, 
+          rejectionReason: o.rejectionReason || null,
+          quantity: Number(o.quantity || 0),
+          drugName: o.drugName,
+          manufacturerOrg: o.manufacturerOrg,
+          pharmacyOrg: o.pharmacyOrg
+        },
+      });
+
+      if (o.fileAttachments && o.fileAttachments.length > 0) {
+        await this.prisma.file.deleteMany({ where: { orderRequestId: order.id } });
+        for (const f of o.fileAttachments) {
+          await this.prisma.file.create({
+            data: {
+              category: 'OTHER', cid: f.cid,
+              url: `https://gateway.pinata.cloud/ipfs/${f.cid}`,
+              name: f.name, type: f.type, size: f.size, orderRequestId: order.id
+            }
+          });
+        }
+      }
+
+      if (o.fulfillments && o.fulfillments.length > 0) {
+        for (const f of o.fulfillments) {
+          const existingFull = await this.prisma.fulfillment.findFirst({
+            where: { orderRequestId: order.id, batchID: f.batchID }
+          });
+          if (!existingFull) {
+            await this.prisma.fulfillment.create({
+              data: {
+                orderRequestId: order.id,
+                batchID: f.batchID,
+                quantity: f.quantity,
+                createdAt: new Date(Number(f.timestamp) * 1000)
+              }
+            });
+          }
+        }
+      }
+
+      if (o.priceOffer) {
+        const status = o.status === 'APPROVED' ? 'APPROVED' : (o.status === 'REJECTED' ? 'REJECTED' : 'PENDING');
+        
+        await this.prisma.priceOffer.updateMany({
+          where: { batchID: o.requestId },
+          data: { status }
+        });
+
+        const existingOffer = await this.prisma.priceOffer.findFirst({
+          where: { batchID: o.requestId, price: Number(o.priceOffer) }
+        });
+
+        if (!existingOffer) {
+          await this.prisma.priceOffer.create({
+            data: {
+              batchID: o.requestId,
+              manufacturerOrg: o.manufacturerOrg,
+              pharmacyOrg: o.pharmacyOrg,
+              price: Number(o.priceOffer),
+              status
+            }
+          });
+        }
+      }
+      return order;
+    } catch (e) {
+      this.logger.error(`Order sync error: ${e.message}`);
+      throw e;
+    }
+  }
+
 }

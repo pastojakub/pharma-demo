@@ -34,7 +34,7 @@ CREATE_RES=$(curl -s -X POST "$API_URL/drugs" \
         \"drugID\": \"1\",
         \"name\": \"Aspirin\",
         \"manufacturer\": \"VyrobcaMSP\",
-        \"expiration\": \"2025-12-31\",
+        \"expiryDate\": \"2025-12-31\",
         \"quantity\": 100,
         \"unit\": \"ks\",
         \"price\": 5.50
@@ -65,6 +65,7 @@ TAMPER_RES=$(docker exec couchdb_vyrobca curl -s -X PUT http://admin:adminpw@loc
         \"drugName\": \"Aspirin\",
         \"manufacturer\": \"VyrobcaMSP\",
         \"ownerOrg\": \"VyrobcaMSP\",
+        \"quantity\": 100,
         \"expiryDate\": \"2099-01-01\",
         \"status\": \"INITIALIZED\",
         \"unit\": \"ks\"

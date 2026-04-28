@@ -1,4 +1,4 @@
-import { Context, Contract } from 'fabric-contract-api';
+import { Context, Contract } from "fabric-contract-api";
 export declare class DrugContract extends Contract {
     private getCollectionName;
     private getTransientValue;
@@ -9,13 +9,16 @@ export declare class DrugContract extends Contract {
     requestDrug(ctx: Context, requestID: string, drugID: string, drugName: string, manufacturerOrg: string, unit: string, fileAttachmentsJSON: string): Promise<void>;
     providePriceOffer(ctx: Context, requestID: string, pharmacyMsp: string): Promise<void>;
     finalizeAgreement(ctx: Context, requestID: string): Promise<void>;
+    private checkRecallStatus;
     transferOwnership(ctx: Context, batchID: string, newOwnerOrg: string, requestID?: string): Promise<string>;
     confirmDelivery(ctx: Context, batchID: string): Promise<void>;
     sellToConsumer(ctx: Context, batchID: string): Promise<void>;
     returnToManufacturer(ctx: Context, batchID: string, manufacturerOrg: string): Promise<void>;
     emergencyRecall(ctx: Context, batchID: string): Promise<void>;
+    private recursiveRecallHelper;
     rejectRequest(ctx: Context, requestID: string, pharmacyMsp: string, reason: string): Promise<void>;
     queryHistory(ctx: Context, batchID: string): Promise<string>;
+    querySubBatches(ctx: Context, batchID: string): Promise<string>;
     readDrugDefinition(ctx: Context, id: string): Promise<Uint8Array>;
     readBatch(ctx: Context, batchID: string): Promise<Uint8Array>;
     readPrivateOrder(ctx: Context, requestID: string, pharmacyMsp: string): Promise<Uint8Array>;

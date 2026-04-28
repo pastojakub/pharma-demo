@@ -97,6 +97,7 @@ export default function UnifiedDashboard() {
 	const [transferQuantity, setTransferQuantity] = useState(0);
 	const [sellQuantity, setSellQuantity] = useState(1);
 	const [offerPrice, setOfferPrice] = useState(0);
+	const [targetOrg, setTargetOrg] = useState("");
 	const [isUploading, setIsUploading] = useState(false);
 	const [drugSearch, setDrugSearch] = useState("");
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -222,6 +223,34 @@ export default function UnifiedDashboard() {
 
 		setModalType(finalType);
 		setModalTab(tab || "details");
+
+		if (type === "SYNC_ORDER" && batch) {
+			try {
+				const id = batch.batchID || (batch as any).requestId;
+				await api.post(`/drugs/orders/${id}/sync`);
+				showToast("Dáta boli úspešne zosynchronizované z blockchainu.", "success");
+				await fetchData();
+				setModalType(""); // Close modal to refresh view
+				return;
+			} catch (e) {
+				showToast("Synchronizácia zlyhala.", "error");
+				return;
+			}
+		}
+
+		if (type === "SYNC_BATCH" && batch) {
+			try {
+				await api.post(`/drugs/sync-batch`, { id: batch.batchID });
+				showToast("Šarža bola úspešne zosynchronizované z blockchainu.", "success");
+				await fetchData();
+				setModalType("");
+				return;
+			} catch (e) {
+				showToast("Synchronizácia zlyhala.", "error");
+				return;
+			}
+		}
+
 		setHistory([]);
 		setIntegrity(null);
 		setSelectedOffer(null);
@@ -313,17 +342,23 @@ export default function UnifiedDashboard() {
 
 			try {
 				if (finalType === "OFFER" || finalType === "APPROVE_OFFER" || finalType === "ORDER_DETAILS") {
-					const offersRes = await api.get(`/drugs/offers/${id}`);
+					const [offersRes, integrityRes] = await Promise.all([
+						api.get(`/drugs/offers/${id}`),
+						api.get(`/drugs/orders/${id}/verify-integrity`)
+					]);
 					setOffers(offersRes.data);
+					setIntegrity(integrityRes.data);
 				}
 				if (
 					finalType === "VIEW_FULFILLMENT" ||
 					finalType === "FULFILL"
 				) {
-					const fullRes = await api.get(
-						`/drugs/orders/${id}/fulfillments`,
-					);
+					const [fullRes, integrityRes] = await Promise.all([
+						api.get(`/drugs/orders/${id}/fulfillments`),
+						api.get(`/drugs/orders/${id}/verify-integrity`)
+					]);
 					setFulfillments(fullRes.data);
+					setIntegrity(integrityRes.data);
 				}
 			} catch (e) {}
 
@@ -363,7 +398,7 @@ export default function UnifiedDashboard() {
 
 			if (integrityData.isValid) {
 				showToast(
-					`Dáta overené v súkromnom kanáli. Stav je integrálny.`,
+					`Dáta overené v súkromnom kanáli. Dáta sú zhodné s blockchainom.`,
 					"success",
 				);
 			} else {
@@ -464,9 +499,13 @@ export default function UnifiedDashboard() {
 					offerID: selectedOffer.id,
 				});
 			} else if (modalType === "TRANSFER" && selectedBatch) {
+				if (!targetOrg) {
+					showToast("Prosím, vyberte cieľovú organizáciu.", "error");
+					return;
+				}
 				response = await api.post("/transfer", {
 					batchID: selectedBatch.batchID,
-					newOwnerOrg: selectedBatch.ownerOrg,
+					newOwnerOrg: targetOrg,
 					quantity: transferQuantity,
 					status: "IN_TRANSIT",
 				});
@@ -697,14 +736,14 @@ export default function UnifiedDashboard() {
 						<button
 							onClick={handleSyncCatalog}
 							className="flex items-center space-x-2 px-6 h-[60px] bg-white border-2 border-gray-100 rounded-[2rem] hover:border-black transition-all group shadow-xl shadow-gray-200/10"
-							title="Synchronizovať katalóg liekov z blockchainu"
+							title="Kompletná synchronizácia všetkých dát z blockchainu (Katalóg, Sklad, Objednávky)"
 						>
-							<History
+							<RotateCcw
 								size={18}
 								className="text-gray-400 group-hover:text-black transition-colors"
 							/>
 							<span className="text-xs font-black uppercase tracking-widest text-black">
-								Sync Katalóg
+								Sync Systém
 							</span>
 						</button>
 						{user.role === "manufacturer" && !isRegulator && (
@@ -1047,6 +1086,8 @@ export default function UnifiedDashboard() {
 								openViewer(url, currentGallery);
 							}
 						}}
+						targetOrg={targetOrg}
+						setTargetOrg={setTargetOrg}
 					/>
 				</Modal>
 

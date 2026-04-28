@@ -45,19 +45,25 @@ export class DrugContract extends Contract {
 		collection?: string,
 	): Promise<void> {
 		let registryBytes;
-		if (collection) {
-			registryBytes = await ctx.stub.getPrivateData(
-				collection,
-				registryKey,
-			);
-		} else {
-			registryBytes = await ctx.stub.getState(registryKey);
+		try {
+			if (collection) {
+				registryBytes = await ctx.stub.getPrivateData(
+					collection,
+					registryKey,
+				);
+			} else {
+				registryBytes = await ctx.stub.getState(registryKey);
+			}
+		} catch (e) {
+			// If we can't read the registry, we'll assume it's broken or missing and start fresh
+			registryBytes = Buffer.from("[]");
 		}
 
 		let registry: string[] = [];
 		if (registryBytes && registryBytes.length > 0) {
 			try {
-				registry = JSON.parse(registryBytes.toString());
+				const str = registryBytes.toString();
+				registry = JSON.parse(str === "" ? "[]" : str);
 			} catch (e) {
 				registry = [];
 			}
@@ -281,12 +287,34 @@ export class DrugContract extends Contract {
 		this.emitEvent(ctx, "AgreementFinalized", { requestID, pharmacyMsp });
 	}
 
+	private async checkRecallStatus(
+		ctx: Context,
+		batchID: string,
+	): Promise<void> {
+		let currentID = batchID;
+		const visited = new Set<string>();
+
+		while (currentID && !visited.has(currentID)) {
+			visited.add(currentID);
+			const batchJSON = await ctx.stub.getState(currentID);
+			if (!batchJSON || batchJSON.length === 0) break;
+
+			const batch: DrugBatch = JSON.parse(batchJSON.toString());
+			if (batch.status === "RECALLED") {
+				throw new Error(
+					`Operácia zamietnutá: Šarža ${batchID} (alebo jej predok ${currentID}) je stiahnutá z obehu!`,
+				);
+			}
+			currentID = batch.parentBatchID || "";
+		}
+	}
+
 	@Transaction()
 	public async transferOwnership(
 		ctx: Context,
 		batchID: string,
 		newOwnerOrg: string,
-		requestID?: string,
+		requestID: string = "",
 	): Promise<string> {
 		const mspId = ctx.clientIdentity.getMSPID();
 		const collection = this.getCollectionName(ctx, mspId);
@@ -297,12 +325,19 @@ export class DrugContract extends Contract {
 			price = Number(this.getTransientValue(ctx, "price"));
 		} catch (e) {}
 
+		await this.checkRecallStatus(ctx, batchID);
+
 		const batchJSON = await ctx.stub.getState(batchID);
 		if (!batchJSON || batchJSON.length === 0)
 			throw new Error("Šarža nenájdená.");
 		const batch: DrugBatch = JSON.parse(batchJSON.toString());
+
 		if (batch.ownerOrg !== mspId)
 			throw new Error("Nie ste vlastníkom šarže.");
+
+		if (batch.ownerOrg === newOwnerOrg) {
+			throw new Error("Nový vlastník musí byť iný ako súčasný.");
+		}
 
 		const privJSON = await ctx.stub.getPrivateData(collection, batchID);
 		if (!privJSON || privJSON.length === 0)
@@ -431,11 +466,14 @@ export class DrugContract extends Contract {
 	@Transaction()
 	public async confirmDelivery(ctx: Context, batchID: string): Promise<void> {
 		const mspId = ctx.clientIdentity.getMSPID();
+		await this.checkRecallStatus(ctx, batchID);
+
 		const batchJSON = await ctx.stub.getState(batchID);
 		if (!batchJSON || batchJSON.length === 0)
 			throw new Error("Šarža nenájdená.");
 
 		const batch: DrugBatch = JSON.parse(batchJSON.toString());
+
 		if (batch.ownerOrg !== mspId)
 			throw new Error("Nie ste vlastníkom tejto šarže.");
 
@@ -450,10 +488,13 @@ export class DrugContract extends Contract {
 		const qSold = Number(this.getTransientValue(ctx, "quantity"));
 		const collection = this.getCollectionName(ctx, mspId);
 
+		await this.checkRecallStatus(ctx, batchID);
+
 		const batchJSON = await ctx.stub.getState(batchID);
 		if (!batchJSON || batchJSON.length === 0)
 			throw new Error(`Šarža ${batchID} nenájdená.`);
 		const batch: DrugBatch = JSON.parse(batchJSON.toString());
+
 		if (batch.ownerOrg !== mspId)
 			throw new Error(
 				`Nie ste vlastníkom šarže ${batchID}. Aktuálny vlastník: ${batch.ownerOrg}`,
@@ -501,6 +542,11 @@ export class DrugContract extends Contract {
 		if (!batchJSON || batchJSON.length === 0)
 			throw new Error("Šarža nenájdená.");
 		const batch: DrugBatch = JSON.parse(batchJSON.toString());
+
+		if (batch.status === "RECALLED") {
+			throw new Error(`Šarža ${batchID} je stiahnutá z obehu (RECALLED) a táto operácia nie je povolená!`);
+		}
+
 		if (batch.ownerOrg !== mspId)
 			throw new Error("Iba aktuálny vlastník môže vrátiť šaržu.");
 
@@ -536,15 +582,51 @@ export class DrugContract extends Contract {
 			);
 		}
 
-		const batchJSON = await ctx.stub.getState(batchID);
-		if (!batchJSON || batchJSON.length === 0)
-			throw new Error("Šarža nenájdená.");
+		// Fetch all batches to build a complete map for recursion
+		const registryBytes = await ctx.stub.getState("REGISTRY_BATCHES");
+		if (!registryBytes || registryBytes.length === 0) {
+			throw new Error("Neboli nájdené žiadne šarže v registri.");
+		}
 
-		const batch: DrugBatch = JSON.parse(batchJSON.toString());
-		batch.status = "RECALLED";
+		const keys: string[] = JSON.parse(registryBytes.toString());
+		const allBatches: DrugBatch[] = [];
+		for (const key of keys) {
+			const val = await ctx.stub.getState(key);
+			if (val && val.length > 0) {
+				allBatches.push(JSON.parse(val.toString()));
+			}
+		}
 
-		await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(batch)));
-		this.emitEvent(ctx, "EmergencyRecall", { batchID });
+		// Start recursive update starting from the target batch
+		await this.recursiveRecallHelper(ctx, batchID, allBatches);
+	}
+
+	private async recursiveRecallHelper(
+		ctx: Context,
+		batchID: string,
+		allBatches: DrugBatch[],
+	): Promise<void> {
+		const batch = allBatches.find((b) => b.batchID === batchID);
+		if (!batch) return;
+
+		// 1. Update the current batch status if not already recalled
+		if (batch.status !== "RECALLED") {
+			batch.status = "RECALLED";
+			await ctx.stub.putState(
+				batchID,
+				Buffer.from(JSON.stringify(batch)),
+			);
+			// Emit event so backends can sync immediately
+			this.emitEvent(ctx, "EmergencyRecall", { batchID });
+		}
+
+		// 2. Find all direct children of this batch
+		const children = allBatches.filter((b) => b.parentBatchID === batchID);
+		
+		// 3. Recursively recall each child
+		for (const child of children) {
+			await this.recursiveRecallHelper(ctx, child.batchID, allBatches);
+		}
 	}
 
 	@Transaction()
@@ -580,6 +662,7 @@ export class DrugContract extends Contract {
 		const allResults = [];
 		let currentID = batchID;
 		const processedIDs = new Set<string>();
+		const processedTxIDs = new Set<string>();
 
 		while (currentID && !processedIDs.has(currentID)) {
 			processedIDs.add(currentID);
@@ -589,6 +672,12 @@ export class DrugContract extends Contract {
 
 			while (!res.done) {
 				if (res.value) {
+					if (processedTxIDs.has(res.value.txId)) {
+						res = await historyIterator.next();
+						continue;
+					}
+					processedTxIDs.add(res.value.txId);
+
 					const jsonRes: any = {};
 					jsonRes.txId = res.value.txId;
 
@@ -633,6 +722,31 @@ export class DrugContract extends Contract {
 		});
 
 		return JSON.stringify(allResults);
+	}
+
+	@Transaction(false)
+	@Returns("string")
+	public async querySubBatches(
+		ctx: Context,
+		batchID: string,
+	): Promise<string> {
+		const registryBytes = await ctx.stub.getState("REGISTRY_BATCHES");
+		if (!registryBytes || registryBytes.length === 0)
+			return JSON.stringify([]);
+
+		const keys: string[] = JSON.parse(registryBytes.toString());
+		const subBatches = [];
+
+		for (const key of keys) {
+			const val = await ctx.stub.getState(key);
+			if (val && val.length > 0) {
+				const batch: DrugBatch = JSON.parse(val.toString());
+				if (batch.parentBatchID === batchID) {
+					subBatches.push(batch);
+				}
+			}
+		}
+		return JSON.stringify(subBatches);
 	}
 
 	@Transaction(false)

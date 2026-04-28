@@ -15,6 +15,12 @@ LOGIN_RES=$(curl -s -X POST "$API_URL/auth/login" \
      -H "Content-Type: application/json" \
      -d "{\"email\":\"$EMAIL\", \"password\":\"$PASSWORD\"}")
 TOKEN=$(echo $LOGIN_RES | jq -r '.access_token')
+
+if [ "$TOKEN" == "null" ] || [ -z "$TOKEN" ]; then
+    echo "   [ERROR] Login failed to get token for prep."
+    exit 1
+fi
+
 REAL_ID=$(curl -s -X GET "$API_URL/drugs/all" -H "Authorization: Bearer $TOKEN" | jq -r '.[0].batchID')
 
 if [ "$REAL_ID" == "null" ] || [ -z "$REAL_ID" ]; then

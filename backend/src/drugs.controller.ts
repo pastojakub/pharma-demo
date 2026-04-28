@@ -280,10 +280,24 @@ export class DrugsController {
     });
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('pharmacy', 'manufacturer')
+  @Post('sync-batch')
+  async syncBatch(@Request() req, @Body() body: { id: string }) {
+    await this.fabricService.syncDrugWithDB(body.id, req.user.org);
+    return { success: true };
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('orders/:id/verify-integrity')
   async verifyOrderIntegrity(@Param('id') id: string, @Request() req) {
     return await this.fabricService.verifyOrderIntegrity(id, req.user.org, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('orders/:id/sync')
+  async syncOrder(@Param('id') id: string, @Request() req) {
+    return await this.fabricService.syncOrderWithDB(id, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -338,7 +352,7 @@ export class DrugsController {
       return {
         isValid: criticalMismatches.length === 0,
         mismatches: [],
-        message: criticalMismatches.length === 0 ? 'Dáta sú integrálne.' : 'Nesúlad kritických údajov zistený.'
+        message: criticalMismatches.length === 0 ? 'Dáta sú zhodné s blockchainom.' : 'Nesúlad kritických údajov zistený.'
       };
     }
 
@@ -385,6 +399,12 @@ export class DrugsController {
     } catch (error) {
       return [];
     }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/sub-batches')
+  async getSubBatches(@Param('id') id: string) {
+    return await this.fabricService.querySubBatches(id);
   }
 
   @Throttle({ default: { limit: 10, ttl: 60000 } })
