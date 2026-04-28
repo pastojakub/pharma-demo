@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+  # --- Manufacturer (Vyrobca) ---
+  db-vyrobca:
+    image: mariadb:10.11
+    command: --innodb-use-native-aio=0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: pharma_db_vyrobca
+    ports:
+      - "3310:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend-vyrobca:
+    build: .
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: mysql://root:root@db-vyrobca:3306/pharma_db_vyrobca
+      FABRIC_MSP_ID: VyrobcaMSP
+      FABRIC_PEER_ENDPOINT: peer0.vyrobca.example.com:7051
+      FABRIC_PEER_HOST_ALIAS: peer0.vyrobca.example.com
+      FABRIC_CHANNEL: pharma-global-channel
+      JWT_SECRET: secret_vyrobca
+      PINATA_JWT: ${PINATA_JWT}
+      PINATA_GATEWAY: ${PINATA_GATEWAY}
+    depends_on:
+      db-vyrobca:
+        condition: service_healthy
+
+  # --- Pharmacy A (Lekarena) ---
+  db-lekarena:
+    image: mariadb:10.11
+    command: --innodb-use-native-aio=0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: pharma_db_lekarena
+    ports:
+      - "3311:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend-lekarena:
+    build: .
+    ports:
+      - "3002:3000"
+    environment:
+      DATABASE_URL: mysql://root:root@db-lekarena:3306/pharma_db_lekarena
+      FABRIC_MSP_ID: LekarenAMSP
+      FABRIC_PEER_ENDPOINT: peer0.lekarena.example.com:7051
+      FABRIC_PEER_HOST_ALIAS: peer0.lekarena.example.com
+      FABRIC_CHANNEL: pharma-global-channel
+      JWT_SECRET: secret_lekarena
+      PINATA_JWT: ${PINATA_JWT}
+      PINATA_GATEWAY: ${PINATA_GATEWAY}
+    depends_on:
+      db-lekarena:
+        condition: service_healthy
+
+  # --- Pharmacy B (LekarenB) ---
+  db-lekarenb:
+    image: mariadb:10.11
+    command: --innodb-use-native-aio=0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: pharma_db_lekarenb
+    ports:
+      - "3312:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend-lekarenb:
+    build: .
+    ports:
+      - "3003:3000"
+    environment:
+      DATABASE_URL: mysql://root:root@db-lekarenb:3306/pharma_db_lekarenb
+      FABRIC_MSP_ID: LekarenBMSP
+      FABRIC_PEER_ENDPOINT: peer0.lekarenb.example.com:7051
+      FABRIC_PEER_HOST_ALIAS: peer0.lekarenb.example.com
+      FABRIC_CHANNEL: pharma-global-channel
+      JWT_SECRET: secret_lekarenb
+      PINATA_JWT: ${PINATA_JWT}
+      PINATA_GATEWAY: ${PINATA_GATEWAY}
+    depends_on:
+      db-lekarenb:
+        condition: service_healthy
+
+  # --- Regulator (SUKL) ---
+  db-sukl:
+    image: mariadb:10.11
+    command: --innodb-use-native-aio=0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: pharma_db_sukl
+    ports:
+      - "3313:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend-sukl:
+    build: .
+    ports:
+      - "3004:3000"
+    environment:
+      DATABASE_URL: mysql://root:root@db-sukl:3306/pharma_db_sukl
+      FABRIC_MSP_ID: SUKLMSP
+      FABRIC_PEER_ENDPOINT: peer0.sukl.example.com:7051
+      FABRIC_PEER_HOST_ALIAS: peer0.sukl.example.com
+      FABRIC_CHANNEL: pharma-global-channel
+      JWT_SECRET: secret_sukl
+      PINATA_JWT: ${PINATA_JWT}
+      PINATA_GATEWAY: ${PINATA_GATEWAY}
+    depends_on:
+      db-sukl:
+        condition: service_healthy
+
+  # --- Database UI (phpMyAdmin) ---
+  phpmyadmin:
+    image: phpmyadmin:latest
+    ports:
+      - "8080:80"
+    environment:
+      PMA_ARBITRARY: 1
+      PMA_HOSTS: db-vyrobca,db-lekarena,db-lekarenb,db-sukl
+    depends_on:
+      - db-vyrobca
+      - db-lekarena
+      - db-lekarenb
+      - db-sukl
+
+networks:
+  default:
+    external:
+      name: fabric_test

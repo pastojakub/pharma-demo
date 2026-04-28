@@ -57,7 +57,7 @@ export class DrugsController {
       body.drugID,
       body.name,
       body.manufacturer,
-      body.expiration,
+      body.expiryDate,
       body.quantity,
       body.unit,
       body.price,
@@ -77,22 +77,9 @@ export class DrugsController {
       body.name,
       body.manufacturerOrg,
       body.quantity,
-      body.unit
+      body.unit,
+      body.fileCIDs || []
     );
-
-    await this.prisma.orderRequest.create({
-      data: {
-        requestId: body.requestID,
-        drugId: body.drugID,
-        drugName: body.name,
-        manufacturerOrg: body.manufacturerOrg,
-        pharmacyOrg: req.user.org,
-        quantity: body.quantity,
-        unit: body.unit,
-        status: 'PENDING'
-      }
-    });
-
     return bcResult;
   }
 
@@ -106,22 +93,6 @@ export class DrugsController {
       body.price,
       body.pharmacyOrg
     );
-
-    await this.prisma.priceOffer.create({
-      data: {
-        batchID: body.requestID,
-        price: body.price,
-        manufacturerOrg: req.user.org,
-        pharmacyOrg: body.pharmacyOrg,
-        status: 'PENDING'
-      }
-    });
-
-    await this.prisma.orderRequest.updateMany({
-      where: { requestId: body.requestID },
-      data: { status: 'OFFER_MADE' }
-    });
-
     return bcResult;
   }
 
@@ -134,43 +105,23 @@ export class DrugsController {
       throw new UnauthorizedException('Ponuka neexistuje alebo nie je určená pre vás.');
     }
 
-    await this.fabricService.finalizeAgreement(
+    return await this.fabricService.finalizeAgreement(
       req.user.userId,
       body.requestID,
       offer.price
     );
-
-    await this.prisma.orderRequest.updateMany({
-      where: { requestId: body.requestID },
-      data: { status: 'APPROVED' }
-    });
-
-    return this.prisma.priceOffer.update({
-      where: { id: body.offerID },
-      data: { status: 'APPROVED' }
-    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('manufacturer', 'pharmacy')
   @Post('reject-request')
   async rejectRequest(@Request() req, @Body() body: RejectRequestDto) {
-    await this.fabricService.rejectRequest(
+    return await this.fabricService.rejectRequest(
       req.user.userId,
       body.requestID,
       body.pharmacyOrg,
       body.reason
     );
-
-    await this.prisma.orderRequest.updateMany({
-      where: { requestId: body.requestID },
-      data: { 
-        status: 'REJECTED',
-        rejectionReason: body.reason 
-      }
-    });
-
-    return { success: true };
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -184,7 +135,10 @@ export class DrugsController {
   @Roles('pharmacy')
   @Post('sell')
   async sellDrug(@Request() req, @Body() body: SellDrugDto) {
-    return await this.fabricService.sellToConsumer(req.user.userId, body.id, body.quantity);
+    const result = await this.fabricService.sellToConsumer(req.user.userId, body.id, body.quantity);
+    // Force immediate sync of this batch
+    await this.fabricService.syncDrugWithDB(body.id, req.user.org);
+    return result;
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -427,7 +381,7 @@ export class DrugsController {
       }
 
       // FIX: Use user's org to access PDCs for history
-      return await this.fabricService.queryHistory(id, user.org);
+      return await this.fabricService.queryHistory(id, 'PublicMSP');
     } catch (error) {
       return [];
     }

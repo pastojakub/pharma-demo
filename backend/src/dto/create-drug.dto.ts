@@ -19,7 +19,7 @@ export class CreateDrugDto {
 
   @IsDateString()
   @IsNotEmpty()
-  expiration: string;
+  expiryDate: string;
 
   @IsNumber()
   @Min(1)

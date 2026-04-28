@@ -1,11 +1,17 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { FabricService } from '../fabric.service';
+import { SyncService } from '../sync.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateDrugDefinitionDto } from '../dto/create-drug-definition.dto';
 
 @Controller('drug-catalog')
 export class DrugCatalogController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private fabricService: FabricService,
+    private syncService: SyncService
+  ) {}
 
   @Get()
   async getAll() {
@@ -15,11 +21,23 @@ export class DrugCatalogController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('sync')
+  async syncWithBlockchain(@Request() req) {
+    try {
+      // Trigger full decentralized mirror sync
+      await this.syncService.syncRecentChanges();
+      return { success: true, message: 'Synchronizácia s blockchainom bola spustená.' };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post()
-  async create(@Body() body: CreateDrugDefinitionDto) {
+  async create(@Body() body: CreateDrugDefinitionDto, @Request() req) {
     const { files, intakeInfo, metadata, ...drugData } = body;
     
-    return this.prisma.drugCatalog.create({
+    const drug = await this.prisma.drugCatalog.create({
       data: {
         ...drugData,
         intakeInfo: intakeInfo || '',
@@ -27,6 +45,7 @@ export class DrugCatalogController {
         files: {
           create: (files || []).map((f: any) => ({
             url: f.url,
+            cid: f.cid,
             name: f.name,
             type: f.type,
             size: f.size,
@@ -36,11 +55,20 @@ export class DrugCatalogController {
       },
       include: { files: true }
     });
+
+    // NEW: Sync with Blockchain for Decentralization
+    try {
+      await this.fabricService.addDrugDefinition(req.user.userId, drug);
+    } catch (e) {
+      console.error(`[Blockchain Sync Error] Drug definition not stored on ledger: ${e.message}`);
+    }
+
+    return drug;
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() body: CreateDrugDefinitionDto) {
+  async update(@Param('id') id: string, @Body() body: CreateDrugDefinitionDto, @Request() req) {
     const { files, intakeInfo, metadata, ...drugData } = body;
     
     if (files) {
@@ -49,7 +77,7 @@ export class DrugCatalogController {
       });
     }
 
-    return this.prisma.drugCatalog.update({
+    const drug = await this.prisma.drugCatalog.update({
       where: { id: Number(id) },
       data: {
         ...drugData,
@@ -58,6 +86,7 @@ export class DrugCatalogController {
         files: files ? {
           create: files.map((f: any) => ({
             url: f.url,
+            cid: f.cid,
             name: f.name,
             type: f.type,
             size: f.size,
@@ -67,5 +96,14 @@ export class DrugCatalogController {
       },
       include: { files: true }
     });
+
+    // NEW: Update on Blockchain
+    try {
+      await this.fabricService.addDrugDefinition(req.user.userId, drug);
+    } catch (e) {
+      console.error(`[Blockchain Sync Error] Updated drug definition not stored on ledger: ${e.message}`);
+    }
+
+    return drug;
   }
 }

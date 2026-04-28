@@ -1,7 +1,7 @@
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 
-const secret = process.env.JWT_SECRET || 'pharma_secret_key_2026'; // Fallback for local dev if .env missing
+const secret = process.env.JWT_SECRET || 'secret_vyrobca'; // Default for Vyrobca in decentralized setup
 const payload = {
   sub: 1,
   email: 'expired@pharma.sk',

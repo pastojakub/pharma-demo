@@ -2,8 +2,15 @@ import axios from 'axios';
 import Cookies from 'js-cookie';
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+  baseURL: typeof window !== 'undefined' ? (localStorage.getItem('api_base_url') || 'http://localhost:3001') : 'http://localhost:3001',
 });
+
+export const setApiBaseUrl = (url: string) => {
+  api.defaults.baseURL = url;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('api_base_url', url);
+  }
+};
 
 api.interceptors.request.use((config) => {
   const token = Cookies.get('auth_token');

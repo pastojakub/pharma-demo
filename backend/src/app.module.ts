@@ -4,6 +4,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { FabricService } from './fabric.service';
 import { PrismaService } from './prisma.service';
+import { IpfsService } from './ipfs.service';
+import { SyncService } from './sync.service';
 import { AuthModule } from './auth/auth.module';
 import { TransferController } from './transfer/transfer.controller';
 import { DrugCatalogController } from './drug-catalog/drug-catalog.controller';
@@ -34,6 +36,8 @@ import { APP_GUARD } from '@nestjs/core';
     AppService, 
     FabricService, 
     PrismaService,
+    IpfsService,
+    SyncService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

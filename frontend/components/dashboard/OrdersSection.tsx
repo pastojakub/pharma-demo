@@ -87,7 +87,7 @@ export const OrdersSection: React.FC<OrdersSectionProps> = ({
                     <Info size={14} className="mr-2 text-gray-400"/> DETAIL
                   </button>
                   
-                  {user.role === 'manufacturer' && (order.status === 'PENDING' || order.status === 'OFFER_MADE') && (
+                  {user.role === 'manufacturer' && (order.status === 'PENDING' || order.status === 'REQUESTED' || order.status === 'OFFER_MADE') && (
                     <>
                       <button 
                         onClick={(e) => {

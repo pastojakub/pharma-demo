@@ -12,6 +12,7 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { IpfsService } from './ipfs.service';
 import * as fromBuffer from 'file-type';
 
 const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg'];
@@ -20,6 +21,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 @Controller('upload')
 export class UploadController {
+  constructor(private ipfsService: IpfsService) {}
   
   @UseGuards(JwtAuthGuard)
   @Post('file')
@@ -55,12 +57,16 @@ export class UploadController {
     // Secondary Check: Verify content via magic bytes
     const type = await fromBuffer.fromFile(file.path);
     if (!type || !ALLOWED_MIME_TYPES.includes(type.mime)) {
-       // Note: In a production environment, you should also delete the file from disk here
        throw new BadRequestException('Detegovaný neplatný obsah súboru (MIME mismatch).');
     }
 
+    // NEW: Upload to IPFS
+    const ipfsData = await this.ipfsService.uploadFile(file.path, file.originalname);
+
     return {
-      url: `/uploads/${file.filename}`,
+      url: ipfsData.url,
+      cid: ipfsData.cid,
+      localUrl: `/uploads/${file.filename}`,
       name: file.originalname,
       type: file.mimetype,
       size: file.size
@@ -98,19 +104,25 @@ export class UploadController {
       throw new BadRequestException('Neboli nahrané žiadne súbory.');
     }
 
-    // Verify all files
+    const results: any[] = [];
     for (const file of files) {
         const type = await fromBuffer.fromFile(file.path);
         if (!type || !ALLOWED_MIME_TYPES.includes(type.mime)) {
             throw new BadRequestException(`Súbor ${file.originalname} má neplatný obsah.`);
         }
+
+        // NEW: Upload to IPFS
+        const ipfsData = await this.ipfsService.uploadFile(file.path, file.originalname);
+        results.push({
+          url: ipfsData.url,
+          cid: ipfsData.cid,
+          localUrl: `/uploads/${file.filename}`,
+          name: file.originalname,
+          type: file.mimetype,
+          size: file.size
+        });
     }
 
-    return files.map(file => ({
-      url: `/uploads/${file.filename}`,
-      name: file.originalname,
-      type: file.mimetype,
-      size: file.size
-    }));
+    return results;
   }
 }

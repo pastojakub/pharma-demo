@@ -4,6 +4,7 @@ import {
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as grpc from '@grpc/grpc-js';
 import {
   connect,
@@ -11,7 +12,7 @@ import {
   Identity,
   Signer,
   signers,
-  GatewayError,
+  Network,
 } from '@hyperledger/fabric-gateway';
 import * as crypto from 'crypto';
 import { promises as fs } from 'fs';
@@ -21,16 +22,38 @@ import { PrismaService } from './prisma.service';
 @Injectable()
 export class FabricService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(FabricService.name);
-  private clients: Map<string, grpc.Client> = new Map();
-  private gateways: Map<string, any> = new Map();
-  private contracts: Map<string, Contract> = new Map();
+  private client: grpc.Client | null = null;
+  private gateway: any = null;
+  private contract: Contract | null = null;
+  private network: Network | null = null;
   private config: any;
+  private initPromise: Promise<void> | null = null;
 
-  constructor(private prisma: PrismaService) {}
+  // Identity Info
+  private mspId: string;
+  private orgName: string;
+
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService
+  ) {
+    this.mspId = this.configService.get<string>('FABRIC_MSP_ID') || 'VyrobcaMSP';
+    this.orgName = this.getOrgName(this.mspId);
+  }
 
   async onModuleInit() {
-    await this.loadConfig();
-    await this.getContract('VyrobcaMSP');
+    this.initPromise = this.internalInit();
+    await this.initPromise;
+  }
+
+  private async internalInit() {
+    try {
+      await this.loadConfig();
+      await this.initGateway();
+    } catch (error) {
+      this.logger.error(`Initial initialization failed: ${error.message}`);
+      // We don't rethrow here to allow the app to start, but subsequent calls will fail if not retried
+    }
   }
 
   private async loadConfig() {
@@ -45,63 +68,58 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
       case 'LekarenAMSP': return 'lekarena';
       case 'LekarenBMSP': return 'lekarenb';
       case 'SUKLMSP': return 'sukl';
-      case 'PublicMSP': return 'public';
       default: return 'vyrobca';
     }
   }
 
-  private getOrgEndpoint(mspId: string): { endpoint: string; hostAlias: string; } {
-    switch (mspId) {
-      case 'VyrobcaMSP': return { endpoint: 'localhost:7051', hostAlias: 'peer0.vyrobca.example.com' };
-      case 'LekarenAMSP': return { endpoint: 'localhost:9051', hostAlias: 'peer0.lekarena.example.com' };
-      case 'LekarenBMSP': return { endpoint: 'localhost:11051', hostAlias: 'peer0.lekarenb.example.com' };
-      case 'SUKLMSP': return { endpoint: 'localhost:13051', hostAlias: 'peer0.sukl.example.com' };
-      case 'PublicMSP': return { endpoint: 'localhost:15051', hostAlias: 'peer0.public.example.com' };
-      default: return { endpoint: 'localhost:7051', hostAlias: 'peer0.vyrobca.example.com' };
-    }
-  }
-
-  private async getContract(mspId: string): Promise<Contract> {
-    const existingContract = this.contracts.get(mspId);
-    if (existingContract) return existingContract;
-
+  private async initGateway() {
     try {
-      const orgName = this.getOrgName(mspId);
-      const { endpoint, hostAlias } = this.getOrgEndpoint(mspId);
-      const channelName = process.env.FABRIC_CHANNEL || this.config.channel;
-      const chaincodeName = process.env.FABRIC_CHAINCODE || this.config.cc;
+      const endpoint = this.configService.get<string>('FABRIC_PEER_ENDPOINT') || 'localhost:7051';
+      const hostAlias = this.configService.get<string>('FABRIC_PEER_HOST_ALIAS') || 'peer0.vyrobca.example.com';
+      const channelName = this.configService.get<string>('FABRIC_CHANNEL') || this.config.channel;
+      const chaincodeName = this.configService.get<string>('FABRIC_CHAINCODE') || this.config.cc;
 
-      const client = await this.newGrpcConnection(orgName, endpoint, hostAlias);
-      const gateway = connect({
-        client,
-        identity: await this.newIdentity(orgName, mspId),
-        signer: await this.newSigner(orgName),
+      this.client = await this.newGrpcConnection(this.orgName, endpoint, hostAlias);
+      this.gateway = connect({
+        client: this.client,
+        identity: await this.newIdentity(this.orgName, this.mspId),
+        signer: await this.newSigner(this.orgName),
       });
 
-      const network = gateway.getNetwork(channelName);
-      const contract = network.getContract(chaincodeName);
+      this.network = this.gateway.getNetwork(channelName);
+      if (!this.network) throw new Error('Failed to get network');
+      this.contract = this.network.getContract(chaincodeName);
 
-      this.clients.set(mspId, client);
-      this.gateways.set(mspId, gateway);
-      this.contracts.set(mspId, contract);
-
-      this.logger.log(`✔ Fabric Gateway connected for ${mspId}.`);
-      return contract;
+      this.logger.log(`✔ Isolated Fabric Gateway connected for ${this.mspId} to ${endpoint}.`);
     } catch (error) {
-      this.logger.error(`Failed to connect for ${mspId}`, error);
+      this.logger.error(`Failed to connect for ${this.mspId}: ${error.message}`);
       throw error;
     }
   }
 
   async onModuleDestroy() {
-    for (const gateway of this.gateways.values()) gateway.close();
-    for (const client of this.clients.values()) client.close();
+    if (this.gateway) this.gateway.close();
+    if (this.client) this.client.close();
   }
 
   private async newGrpcConnection(orgName: string, endpoint: string, hostAlias: string): Promise<grpc.Client> {
     const tlsCertPath = path.resolve(process.cwd(), this.config.walletPath, `ca/${orgName}-ca.crt`);
     const tlsRootCert = await fs.readFile(tlsCertPath);
-    return new grpc.Client(endpoint, grpc.credentials.createSsl(tlsRootCert), { 'grpc.ssl_target_name_override': hostAlias });
+    
+    // Optional: Load global TLS CA if it exists for extra compatibility
+    let combinedCerts = tlsRootCert;
+    try {
+      const globalTlsPath = path.resolve(process.cwd(), this.config.walletPath, 'ca/tls-ca.crt');
+      const globalTlsCert = await fs.readFile(globalTlsPath);
+      combinedCerts = Buffer.concat([tlsRootCert, Buffer.from('\n'), globalTlsCert]);
+    } catch (e) {}
+
+    return new grpc.Client(endpoint, grpc.credentials.createSsl(combinedCerts), { 
+      'grpc.ssl_target_name_override': hostAlias,
+      'grpc.keepalive_time_ms': 120000,
+      'grpc.keepalive_timeout_ms': 20000,
+      'grpc.keepalive_permit_without_calls': 1
+    });
   }
 
   private async newIdentity(orgName: string, mspId: string): Promise<Identity> {
@@ -117,11 +135,31 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
     return signers.newPrivateKeySigner(privateKey);
   }
 
-  private async executeTransaction(name: string, args: string[], userID: number, isQuery = false, transientData?: Record<string, Uint8Array>): Promise<any> {
-    const user = await this.prisma.user.findUnique({ where: { id: Number(userID) } });
-    if (!user) throw new Error(`User ${userID} not found`);
-    const contract = await this.getContract(user.org);
+  public async getContract(): Promise<Contract> {
+    if (this.initPromise) await this.initPromise;
+    if (!this.contract) {
+       // Try one more time if it's null but we need it
+       await this.internalInit();
+       if (!this.contract) throw new Error('Contract not initialized');
+    }
+    return this.contract;
+  }
 
+  public async getNetwork(): Promise<Network> {
+    if (this.initPromise) await this.initPromise;
+    if (!this.network) {
+       await this.internalInit();
+       if (!this.network) throw new Error('Network not initialized');
+    }
+    return this.network;
+  }
+
+  public getLocalMspId(): string {
+    return this.mspId;
+  }
+
+  async executeTransaction(name: string, args: string[], userID: number, isQuery = false, transientData?: Record<string, Uint8Array>): Promise<any> {
+    const contract = await this.getContract();
     try {
       if (isQuery) {
         const resultBytes = await contract.evaluateTransaction(name, ...args);
@@ -137,21 +175,11 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
         if (!status.successful) throw new Error(`Transaction failed with status code ${status.code}`);
 
         if (userID) await this.createAuditLog(name, args[0], userID, args);
-        await this.handlePostTxSync(name, args, user.org, result);
         return result;
       }
     } catch (error) {
-      this.handleError(error, name);
-    }
-  }
-
-  private async handlePostTxSync(name: string, args: string[], mspId: string, result?: any) {
-    const batchOps = ['initBatch', 'transferOwnership', 'confirmDelivery', 'sellToConsumer', 'returnToManufacturer', 'emergencyRecall'];
-    if (batchOps.includes(name) && args[0]) {
-      await this.syncDrugWithDB(args[0], mspId);
-      if (name === 'transferOwnership' && typeof result === 'string' && result !== args[0]) {
-        await this.syncDrugWithDB(result, mspId);
-      }
+      this.logger.error(`[${name}] Error: ${error.message}`);
+      throw error;
     }
   }
 
@@ -161,23 +189,34 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
     } catch (e) { this.logger.error(`Audit log failed: ${e.message}`); }
   }
 
-  private scavenger(obj: any, keys: string[]): any {
-    if (!obj) return undefined;
+  public decodeResult(resultBytes: Uint8Array | null, rawValue?: any): any {
+    if ((!resultBytes || resultBytes.length === 0) && typeof rawValue === 'undefined') return undefined;
     
-    if (typeof obj === 'object' && obj.type === 'Buffer' && Array.isArray(obj.data)) {
-        return this.scavenger(this.decodeResult(Uint8Array.from(obj.data)), keys);
-    }
-    if (Buffer.isBuffer(obj) || obj instanceof Uint8Array) {
-        return this.scavenger(this.decodeResult(obj), keys);
+    let value = rawValue;
+    if (resultBytes && resultBytes.length > 0) value = new TextDecoder().decode(resultBytes);
+
+    if (typeof value !== 'string') {
+        if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
+            return this.decodeResult(Uint8Array.from(value.data));
+        }
+        return value;
     }
 
-    if (typeof obj === 'string') {
-        try {
-            const parsed = JSON.parse(obj);
-            if (typeof parsed === 'object') return this.scavenger(parsed, keys);
-        } catch (e) {}
-    }
+    if (value === 'null') return null;
+    if (value === 'undefined') return undefined;
 
+    try {
+        const parsed = JSON.parse(value);
+        if (typeof parsed === 'string' && parsed !== value) return this.decodeResult(null, parsed);
+        if (typeof parsed === 'object' && parsed !== null && (parsed as any).type === 'Buffer') return this.decodeResult(null, parsed);
+        return parsed;
+    } catch (e) { return value; }
+  }
+
+  public scavenger(obj: any, keys: string[]): any {
+    if (!obj) return undefined;
+    if (typeof obj === 'object' && obj.type === 'Buffer') return this.scavenger(this.decodeResult(null, obj), keys);
+    
     const search = (item: any): any => {
         if (Array.isArray(item)) {
             for (const el of item) {
@@ -204,39 +243,141 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
         }
         return undefined;
     };
-
-    const res = search(obj);
-    if (typeof res !== 'undefined') return res;
-
-    try {
-        const str = typeof obj === 'string' ? obj : JSON.stringify(obj);
-        for (const k of keys) {
-            const regex = new RegExp(`"${k}"\\s*:\\s*["']?([^"',}]+)["']?`, 'i');
-            const match = str.match(regex);
-            if (match && match[1]) return match[1];
-        }
-    } catch (e) {}
-
-    return undefined;
+    return search(obj);
   }
 
-  async syncDrugWithDB(batchID: string, mspId: string, retryCount = 0) {
+  // Business Logic Wrappers
+  async initBatch(uID: number, bID: string, dID: string, name: string, m: string, exp: string, q: number, unit: string, p: number, meta?: string) {
+    const transient = { price: Buffer.from(p.toString()), quantity: Buffer.from(q.toString()), metadata: Buffer.from(meta || '') };
+    return this.executeTransaction('initBatch', [bID, dID, name, m, exp, unit], uID, false, transient);
+  }
+
+  async requestDrug(uID: number, rID: string, dID: string, name: string, mOrg: string, q: number, unit: string, files: any[] = []) {
+    const transient = { quantity: Buffer.from(q.toString()) };
+    return this.executeTransaction('requestDrug', [rID, dID, name, mOrg, unit, JSON.stringify(files)], uID, false, transient);
+  }
+
+  async providePriceOffer(uID: number, rID: string, p: number, pMsp: string) {
+    const transient = { price: Buffer.from(p.toString()) };
+    return this.executeTransaction('providePriceOffer', [rID, pMsp], uID, false, transient);
+  }
+
+  async finalizeAgreement(uID: number, rID: string, p: number) {
+    const transient = { price: Buffer.from(p.toString()) };
+    return this.executeTransaction('finalizeAgreement', [rID], uID, false, transient);
+  }
+
+  async transferOwnership(uID: number, bID: string, nOrg: string, q: number, price?: number, requestID?: string) {
+    const transient: any = { quantity: Buffer.from(q.toString()) };
+    if (price) transient.price = Buffer.from(price.toString());
+    const args = [bID, nOrg];
+    if (requestID) args.push(requestID);
+    return this.executeTransaction('transferOwnership', args, uID, false, transient);
+  }
+
+  async sellToConsumer(uID: number, bID: string, q: number) {
+    const transient = { quantity: Buffer.from(q.toString()) };
+    return this.executeTransaction('sellToConsumer', [bID], uID, false, transient);
+  }
+
+  async confirmDelivery(uID: number, bID: string) { return this.executeTransaction('confirmDelivery', [bID], uID, false); }
+  async returnToManufacturer(uID: number, bID: string, mOrg: string) { return this.executeTransaction('returnToManufacturer', [bID, mOrg], uID, false); }
+  async emergencyRecall(uID: number, bID: string) { return this.executeTransaction('emergencyRecall', [bID], uID, false); }
+  async rejectRequest(uID: number, rID: string, pMsp: string, reason: string = '') {
+    return this.executeTransaction('rejectRequest', [rID, pMsp, reason], uID, false);
+  }
+
+  async addDrugDefinition(uID: number, drug: any) {
+    const gallery = drug.files.filter(f => f.category === 'GALLERY').map(f => ({
+      cid: f.cid, name: f.name, type: f.type, size: f.size
+    }));
+    const leafletRaw = drug.files.find(f => f.category === 'LEAFLET');
+    const leaflet = leafletRaw ? {
+      cid: leafletRaw.cid, name: leafletRaw.name, type: leafletRaw.type, size: leafletRaw.size
+    } : null;
+
+    return this.executeTransaction('addDrugDefinition', [
+      String(drug.id), 
+      drug.name, 
+      drug.composition, 
+      drug.recommendedDosage, 
+      drug.intakeInfo || '', 
+      drug.metadata || '', 
+      JSON.stringify(leaflet), 
+      JSON.stringify(gallery)
+    ], uID, false);
+  }
+
+  async readDrugDefinition(uID: number, id: string) { return this.executeTransaction('readDrugDefinition', [id], uID, true); }
+  async getAllDrugDefinitions(uID: number) { return this.executeTransaction('GetAllDrugDefinitions', [], uID, true); }
+
+  async queryHistory(bID: string, mspId: string) {
+     const results = await this.executeTransaction('queryHistory', [bID], 1, true);
+     if (Array.isArray(results)) return results.map(r => ({ ...r, sourceMsp: mspId }));
+     return results;
+  }
+
+  // Restore missing public API methods
+  async getAllDrugs(user: any) {
+    if (user.role === 'regulator') return await this.prisma.drug.findMany({ orderBy: { createdAt: 'desc' } });
+    return await this.prisma.drug.findMany({ 
+      where: { 
+        ownerOrg: user.org,
+        NOT: [
+          { status: 'SOLD' },
+          { quantity: 0 }
+        ]
+      }, 
+      orderBy: { createdAt: 'desc' } 
+    });
+  }
+
+  async getBatchPrice(batchID: string, mspId: string) {
+     return this.executeTransaction('getBatchPrice', [batchID], 1, true);
+  }
+
+  async verifyBatch(batchID: string, mspId: string) {
+     return this.executeTransaction('verifyBatch', [batchID], 1, true);
+  }
+
+  async readBatchWithMsp(batchID: string, mspId: string) {
+     return this.executeTransaction('readBatch', [batchID], 1, true);
+  }
+
+  async readPrivateOrder(requestID: string, userID: number, pharmacyMsp: string) {
+     return this.executeTransaction('readPrivateOrder', [requestID, pharmacyMsp], userID, true);
+  }
+
+  async verifyOrderIntegrity(requestId: string, mspId: string, userID: number) {
+    const db = await this.prisma.orderRequest.findUnique({ where: { requestId } });
+    if (!db) return { isValid: false, message: 'Objednávka nebola nájdená v databáze.' };
+    const bc = await this.readPrivateOrder(requestId, userID, db.pharmacyOrg);
+    if (!bc) return { isValid: false, message: 'Blockchain dáta nedostupné.', db };
+    return { isValid: true, db, bc };
+  }
+
+  async syncDrugWithDB(batchID: string, mspId: string) {
     try {
       const drugJSON = await this.readBatchWithMsp(batchID, mspId);
-      if (!drugJSON) throw new Error(`Batch ${batchID} not found on ledger yet.`);
+      if (!drugJSON) return;
 
       let privateData: any = null;
       try {
-        const pRes = await this.getBatchPriceWithMsp(batchID, mspId);
+        const pRes = await this.getBatchPrice(batchID, mspId);
         privateData = this.decodeResult(null, pRes);
-      } catch (e) {
-        if (mspId !== 'PublicMSP') {
-           this.logger.warn(`Private data for ${batchID} not indexed yet. Retrying...`);
-           throw new Error('Private data indexing delay');
+        // Explicitly check for error response from chaincode
+        if (privateData && privateData.error) {
+          privateData = null;
         }
-      }
+      } catch (e) {}
 
-      const actualQty = (privateData && typeof privateData.quantity !== 'undefined') ? Number(privateData.quantity) : Number(this.scavenger(drugJSON, ['quantity']) || 0);
+      // If private data (quantity) is missing for the current org, we try to use what's in the DB 
+      // or default to 0 if it's not the owner org. 
+      // But if we are syncing, we want the truth from the blockchain.
+      const actualQty = (privateData && typeof privateData.quantity !== 'undefined') 
+        ? Number(privateData.quantity) 
+        : (drugJSON.status === 'SOLD' ? 0 : Number(this.scavenger(drugJSON, ['quantity']) || 0));
+        
       const price = (privateData && typeof privateData.price !== 'undefined') ? Number(privateData.price) : null;
 
       const dID = this.scavenger(drugJSON, ['drugID', 'drugId', 'id']);
@@ -257,241 +398,20 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
           price: isFinite(Number(price)) ? Number(price) : null, metadata: drugJSON.metadata
         }
       });
-      this.logger.log(`✔ Synced ${batchID} to DB.`);
-      
-      // NEW: After syncing drug, check if any orders associated with this batch are now fulfilled
-      await this.checkAndUpdateOrderStatus(batchID);
     } catch (e) {
-      if (retryCount < 5) {
-        const delay = 1000 * Math.pow(2, retryCount);
-        this.logger.warn(`Sync retry ${retryCount + 1} for ${batchID} after ${delay}ms: ${e.message}`);
-        await new Promise(res => setTimeout(res, delay));
-        return this.syncDrugWithDB(batchID, mspId, retryCount + 1);
-      }
+      this.logger.error(`Sync error: ${e.message}`);
     }
   }
 
-  private async checkAndUpdateOrderStatus(batchID: string) {
-    try {
-      const fulfillments = await this.prisma.fulfillment.findMany({
-        where: { batchID },
-        include: { orderRequest: { include: { fulfillments: true } } }
-      });
-
-      for (const f of fulfillments) {
-        const order = f.orderRequest;
-        if (order.status === 'FULFILLED') continue;
-
-        // Check all batches in this order
-        const allBatchIDs = order.fulfillments.map(of => of.batchID);
-        const batchesInDB = await this.prisma.drug.findMany({
-          where: { batchID: { in: allBatchIDs } }
-        });
-
-        const allDelivered = allBatchIDs.every(id => {
-          const b = batchesInDB.find(bdb => bdb.batchID === id);
-          // Batch must exist and have a status that implies it was received
-          return b && (b.status === 'DELIVERED' || b.status === 'SOLD' || b.status === 'OWNED');
-        });
-
-        if (allDelivered && allBatchIDs.length > 0) {
-          await this.prisma.orderRequest.update({
-            where: { id: order.id },
-            data: { status: 'FULFILLED' }
-          });
-          this.logger.log(`✔ Order ${order.requestId} marked as FULFILLED.`);
-        }
-      }
-    } catch (e) {
-      this.logger.error(`Failed to update order status: ${e.message}`);
-    }
-  }
-
-  async verifyIntegrity(batchID: string, mspId: string) {
+  async verifyIntegrity(batchID: string, mspId?: string) {
     const db = await this.prisma.drug.findUnique({ where: { batchID } });
-    if (!db) return { isValid: false, message: 'Šarža nebola nájdená v lokálnej databáze.', db: null, bc: null, mismatches: [] as string[] };
-    
-    let bc;
-    try {
-      bc = await this.readBatchWithMsp(batchID, mspId);
-    } catch (bcError) {
-      return { isValid: false, message: 'Šarža nebola nájdená na blockchaine.', db, bc: null, error: bcError.message, mismatches: [] as string[] };
-    }
+    if (!db) return { isValid: false, message: 'Nenájdené v DB', mismatches: [] };
+    const bc = await this.executeTransaction('readBatch', [batchID], 1, true);
+    if (!bc) return { isValid: false, message: 'Blockchain dáta nedostupné', mismatches: [] };
     
     const mismatches: string[] = [];
-    const bcDrugID = this.scavenger(bc, ['drugID', 'drugId', 'id']);
-    const bcDrugName = this.scavenger(bc, ['drugName', 'name']);
-
-    if (String(db.drugID) !== String(bcDrugID)) mismatches.push(`Liek ID: DB(${db.drugID}) vs BC(${bcDrugID})`);
-    if (String(db.drugName) !== String(bcDrugName)) mismatches.push(`Názov: DB(${db.drugName}) vs BC(${bcDrugName})`);
-    if (String(db.manufacturer) !== String(bc.manufacturer)) mismatches.push(`Výrobca: DB(${db.manufacturer}) vs BC(${bc.manufacturer})`);
-    if (String(db.ownerOrg) !== String(bc.ownerOrg)) mismatches.push(`Vlastník: DB(${db.ownerOrg}) vs BC(${bc.ownerOrg})`);
-    if (String(db.unit) !== String(bc.unit)) mismatches.push(`Jednotka: DB(${db.unit}) vs BC(${bc.unit})`);
-    if (String(db.expiryDate) !== String(bc.expiryDate)) mismatches.push(`Exspirácia: DB(${db.expiryDate}) vs BC(${bc.expiryDate})`);
     if (String(db.status) !== String(bc.status)) mismatches.push(`Stav: DB(${db.status}) vs BC(${bc.status})`);
-
-    return { isValid: mismatches.length === 0, mismatches, db, bc };
-  }
-
-  async verifyOrderIntegrity(requestId: string, mspId: string, userID: number) {
-    const db = await this.prisma.orderRequest.findUnique({ where: { requestId } });
-    if (!db) return { isValid: false, message: 'Objednávka nebola nájdená v databáze.' };
     
-    let bc;
-    try {
-      bc = await this.readPrivateOrder(requestId, userID, db.pharmacyOrg);
-    } catch (e) {
-      this.logger.error(`[ERROR] Verify Order ${requestId} failed: ${e.message}`);
-      return { isValid: false, message: `Chyba pri čítaní z blockchainu: ${e.message}`, db, bc: null };
-    }
-
-    if (!bc) {
-      return { isValid: false, message: 'Súkromné dáta objednávky neboli na blockchaine nájdené.', db, bc: null };
-    }
-
-    const mismatches: string[] = [];
-    const bcDrugID = this.scavenger(bc, ['drugID', 'drugId', 'id']);
-    const bcDrugName = this.scavenger(bc, ['drugName', 'name']);
-    const bcQty = this.scavenger(bc, ['quantity', 'qty']);
-
-    if (typeof bcDrugID === 'undefined') mismatches.push('Liek ID: Chýba na blockchaine');
-    else if (String(db.drugId) !== String(bcDrugID)) mismatches.push(`Liek ID: DB(${db.drugId}) vs BC(${bcDrugID})`);
-
-    if (typeof bcDrugName === 'undefined') mismatches.push('Názov: Chýba na blockchaine');
-    else if (String(db.drugName) !== String(bcDrugName)) mismatches.push(`Názov: DB(${db.drugName}) vs BC(${bcDrugName})`);
-
-    if (typeof bcQty === 'undefined') mismatches.push('Množstvo: Chýba na blockchaine');
-    else if (Math.abs(Number(db.quantity) - Number(bcQty)) > 0.0001) mismatches.push(`Množstvo: DB(${db.quantity}) vs BC(${bcQty})`);
-    
-    return { isValid: mismatches.length === 0, mismatches, db, bc };
-  }
-
-  private decodeResult(resultBytes: Uint8Array | null, rawValue?: any): any {
-    if ((!resultBytes || resultBytes.length === 0) && typeof rawValue === 'undefined') return undefined;
-    
-    let value = rawValue;
-    if (resultBytes && resultBytes.length > 0) value = new TextDecoder().decode(resultBytes);
-
-    if (typeof value !== 'string') {
-        if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
-            return this.decodeResult(Uint8Array.from(value.data));
-        }
-        return value;
-    }
-
-    if (value === 'null') return null;
-    if (value === 'undefined') return undefined;
-
-    try {
-        const parsed = JSON.parse(value);
-        if (typeof parsed === 'string' && parsed !== value) return this.decodeResult(null, parsed);
-        if (typeof parsed === 'object' && parsed !== null && (parsed as any).type === 'Buffer') return this.decodeResult(null, parsed);
-        return parsed;
-    } catch (e) { return value; }
-  }
-
-  public async readBatchWithMsp(batchID: string, mspId: string): Promise<any> {
-    const contract = await this.getContract(mspId);
-    const resultBytes = await contract.evaluateTransaction('readBatch', batchID);
-    return this.decodeResult(resultBytes);
-  }
-
-  private async getBatchPriceWithMsp(batchID: string, mspId: string): Promise<any> {
-    const contract = await this.getContract(mspId);
-    const resultBytes = await contract.evaluateTransaction('getBatchPrice', batchID);
-    return this.decodeResult(resultBytes);
-  }
-
-  async initBatch(uID: number, bID: string, dID: string, name: string, m: string, exp: string, q: number, unit: string, p: number, meta?: string) {
-    const transient = { price: Buffer.from(p.toString()), quantity: Buffer.from(q.toString()), metadata: Buffer.from(meta || '') };
-    return this.executeTransaction('initBatch', [bID, dID, name, m, exp, unit], uID, false, transient);
-  }
-
-  async requestDrug(uID: number, rID: string, dID: string, name: string, mOrg: string, q: number, unit: string) {
-    const transient = { quantity: Buffer.from(q.toString()) };
-    return this.executeTransaction('requestDrug', [rID, dID, name, mOrg, unit], uID, false, transient);
-  }
-
-  async providePriceOffer(uID: number, rID: string, p: number, pMsp: string) {
-    const transient = { price: Buffer.from(p.toString()) };
-    return this.executeTransaction('providePriceOffer', [rID, pMsp], uID, false, transient);
-  }
-
-  async finalizeAgreement(uID: number, rID: string, p: number) {
-    const transient = { price: Buffer.from(p.toString()) };
-    return this.executeTransaction('finalizeAgreement', [rID], uID, false, transient);
-  }
-
-  async transferOwnership(uID: number, bID: string, nOrg: string, q: number, price?: number) {
-    const transient: any = { quantity: Buffer.from(q.toString()) };
-    if (price) transient.price = Buffer.from(price.toString());
-    return this.executeTransaction('transferOwnership', [bID, nOrg], uID, false, transient);
-  }
-
-  async sellToConsumer(uID: number, bID: string, q: number) {
-    const transient = { quantity: Buffer.from(q.toString()) };
-    return this.executeTransaction('sellToConsumer', [bID], uID, false, transient);
-  }
-
-  async confirmDelivery(uID: number, bID: string) { return this.executeTransaction('confirmDelivery', [bID], uID, false); }
-  async returnToManufacturer(uID: number, bID: string, mOrg: string) { return this.executeTransaction('returnToManufacturer', [bID, mOrg], uID, false); }
-  async emergencyRecall(uID: number, bID: string) { return this.executeTransaction('emergencyRecall', [bID], uID, false); }
-  async rejectRequest(uID: number, rID: string, pMsp: string, reason?: string) {
-    const args = [rID, pMsp];
-    if (reason) args.push(reason);
-    return this.executeTransaction('rejectRequest', args, uID, false);
-  }
-
-  async queryHistoryWithMsp(bID: string, mspId: string) {
-    const contract = await this.getContract(mspId);
-    const res = await contract.evaluateTransaction('queryHistory', bID);
-    const result = this.decodeResult(res);
-    if (Array.isArray(result)) {
-        return result.map(entry => ({ ...entry, sourceMsp: mspId }));
-    }
-    return result;
-  }
-
-  async queryHistory(bID: string, mspId: string) {
-    const result = await this.queryHistoryWithMsp(bID, mspId);
-    if (Array.isArray(result) && result.length === 0 && mspId !== 'VyrobcaMSP') {
-        this.logger.warn(`History for ${bID} empty on ${mspId} peer. Falling back to VyrobcaMSP...`);
-        return this.queryHistoryWithMsp(bID, 'VyrobcaMSP');
-    }
-    return result;
-  }
-
-  async verifyBatch(bID: string, mspId: string) {
-    const contract = await this.getContract(mspId);
-    const res = await contract.evaluateTransaction('verifyBatch', bID);
-    return this.decodeResult(res);
-  }
-
-  async getAllDrugs(user: any) {
-    if (user.role === 'regulator') return await this.prisma.drug.findMany({ orderBy: { createdAt: 'desc' } });
-    return await this.prisma.drug.findMany({ where: { ownerOrg: user.org }, orderBy: { createdAt: 'desc' } });
-  }
-
-  async getBatchPrice(bID: string, mspId: string) { return this.getBatchPriceWithMsp(bID, mspId); }
-  
-  async readPrivateOrder(rID: string, uID: number, pMsp: string) { 
-    try {
-      const result = await this.executeTransaction('readPrivateOrder', [rID, pMsp], uID, true); 
-      if (!result) throw new Error('NOT_FOUND_ON_LOCAL_PEER');
-      return result;
-    } catch (e) {
-      if (e.message.includes('NOT_FOUND_ON_LOCAL_PEER') || e.message.includes('nie sú dostupné') || e.message.includes('not available')) {
-        this.logger.warn(`Private data for order ${rID} not found on local peer. Attempting direct query to ${pMsp} peer...`);
-        const contract = await this.getContract(pMsp);
-        const resultBytes = await contract.evaluateTransaction('readPrivateOrder', rID, pMsp);
-        return this.decodeResult(resultBytes);
-      }
-      throw e;
-    }
-  }
-
-  private handleError(error: any, context: string) {
-    this.logger.error(`[${context}] Error: ${error.message}`);
-    throw error;
+    return { isValid: mismatches.length === 0, db, bc, mismatches }; 
   }
 }

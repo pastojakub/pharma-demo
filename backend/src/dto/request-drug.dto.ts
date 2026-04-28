@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, Min, IsOptional } from 'class-validator';
 
 export class RequestDrugDto {
   @IsString()
@@ -24,4 +24,7 @@ export class RequestDrugDto {
   @IsString()
   @IsNotEmpty()
   unit: string;
+
+  @IsOptional()
+  fileCIDs?: string[];
 }

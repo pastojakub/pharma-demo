@@ -19,10 +19,10 @@ if [ ! -d "blockchain-network" ]; then
     exit 1
 fi
 
-infoln "1. Stopping Backend Services (MariaDB)..."
+infoln "1. Stopping Decentralized Backend Services..."
 cd backend
-sudo docker-compose stop
-successln "Backend database stopped."
+sudo docker-compose -f docker-compose-decentralized.yaml stop
+successln "Decentralized backends and databases stopped."
 
 infoln "2. Stopping Blockchain Network Services..."
 cd ../blockchain-network/prod-network

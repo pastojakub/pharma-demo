@@ -31,6 +31,7 @@ model DrugCatalog {
 model File {
   id             Int          @id @default(autoincrement())
   url            String
+  cid            String?      // IPFS Content Identifier
   name           String       // Original filename
   type           String       // MIME type
   size           Int
@@ -80,6 +81,7 @@ model Drug {
   expiryDate   String
   status       String
   price        Float?
+  priceOffer   Float?
   metadata     String?  @db.Text
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

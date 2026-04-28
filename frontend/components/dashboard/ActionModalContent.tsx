@@ -1045,10 +1045,10 @@ export const ActionModalContent: React.FC<ActionModalContentProps> = ({
 					/>
 					<FormField
 						label="Exspirácia"
-						value={newBatch.expiration}
+						value={newBatch.expiryDate}
 						type="date"
 						onChange={(v: string) =>
-							setNewBatch({ ...newBatch, expiration: v })
+							setNewBatch({ ...newBatch, expiryDate: v })
 						}
 					/>
 				</div>

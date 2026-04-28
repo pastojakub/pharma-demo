@@ -16,6 +16,14 @@ class FileDto {
   url: string;
 
   @IsString()
+  @IsOptional()
+  cid?: string;
+
+  @IsString()
+  @IsOptional()
+  localUrl?: string;
+
+  @IsString()
   @IsNotEmpty()
   name: string;
 

@@ -15,7 +15,7 @@ async function bootstrap() {
   // Use Helmet for secure HTTP headers
   app.use(
     helmet({
-      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      crossOriginResourcePolicy: false,
     }),
   );
 
@@ -59,6 +59,6 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
 
-  await app.listen(process.env.PORT ?? 3001);
+  await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

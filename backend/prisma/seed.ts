@@ -10,56 +10,48 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   const password = await bcrypt.hash('heslo123', 10);
+  const localMspId = process.env.FABRIC_MSP_ID;
 
-  // 1. Výrobca (Manufacturer)
-  await prisma.user.upsert({
-    where: { email: 'vyrobca@pharma.sk' },
-    update: { org: 'VyrobcaMSP' },
-    create: {
+  const allUsers = [
+    {
       email: 'vyrobca@pharma.sk',
       password: password,
       role: 'manufacturer',
       org: 'VyrobcaMSP',
     },
-  });
-
-  // 2. Lekáreň A (Pharmacy A)
-  await prisma.user.upsert({
-    where: { email: 'lekaren@pharma.sk' },
-    update: { org: 'LekarenAMSP' },
-    create: {
+    {
       email: 'lekaren@pharma.sk',
       password: password,
       role: 'pharmacy',
       org: 'LekarenAMSP',
     },
-  });
-
-  // 2b. Lekáreň B (Pharmacy B)
-  await prisma.user.upsert({
-    where: { email: 'lekarenb@pharma.sk' },
-    update: { org: 'LekarenBMSP' },
-    create: {
+    {
       email: 'lekarenb@pharma.sk',
       password: password,
       role: 'pharmacy',
       org: 'LekarenBMSP',
     },
-  });
-
-  // 3. Regulačný orgán (ŠÚKL / Regulator)
-  await prisma.user.upsert({
-    where: { email: 'sukl@pharma.sk' },
-    update: { org: 'SUKLMSP' },
-    create: {
+    {
       email: 'sukl@pharma.sk',
       password: password,
       role: 'regulator',
       org: 'SUKLMSP',
     },
-  });
+  ];
 
-  console.log('✔ Seedovanie používateľov dokončené.');
+  // Only seed the user that belongs to THIS organization's infrastructure
+  const userToSeed = allUsers.find(u => u.org === localMspId);
+
+  if (userToSeed) {
+    await prisma.user.upsert({
+      where: { email: userToSeed.email },
+      update: { org: userToSeed.org },
+      create: userToSeed,
+    });
+    console.log(`✔ Seeded sovereign user for ${localMspId}: ${userToSeed.email}`);
+  } else {
+    console.warn(`⚠ No matching user found to seed for MSP ID: ${localMspId}`);
+  }
 }
 
 main()

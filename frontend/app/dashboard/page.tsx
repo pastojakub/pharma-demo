@@ -21,6 +21,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	ShieldCheck,
+	History,
 } from "lucide-react";
 import { InventorySection } from "../../components/dashboard/InventorySection";
 import { OrdersSection } from "../../components/dashboard/OrdersSection";
@@ -80,7 +81,7 @@ export default function UnifiedDashboard() {
 		drugID: "",
 		name: "",
 		manufacturer: "",
-		expiration: "",
+		expiryDate: "",
 		price: 0,
 		quantity: 1,
 		unit: "ks",
@@ -146,6 +147,20 @@ export default function UnifiedDashboard() {
 			return null;
 		} finally {
 			setIsRefreshing(false);
+		}
+	};
+
+	const handleSyncCatalog = async () => {
+		try {
+			const res = await api.post("/drug-catalog/sync");
+			if (res.data.success) {
+				showToast(`Synchronizácia úspešná! Spracovaných ${res.data.count} položiek.`, "success");
+				fetchData();
+			} else {
+				showToast(`Chyba pri synchronizácii: ${res.data.error}`, "error");
+			}
+		} catch (error) {
+			showToast("Synchronizácia zlyhala.", "error");
 		}
 	};
 
@@ -233,7 +248,7 @@ export default function UnifiedDashboard() {
 				drugID: "",
 				name: "",
 				manufacturer: "",
-				expiration: "",
+				expiryDate: "",
 				price: 0,
 				quantity: 1,
 				unit: "ks",
@@ -271,7 +286,7 @@ export default function UnifiedDashboard() {
 					drugID: String(drug.id),
 					name: drug.name,
 					manufacturer: user?.org || "",
-					expiration: "",
+					expiryDate: "",
 					price: 0,
 					quantity: 1,
 					unit: "ks",
@@ -374,7 +389,7 @@ export default function UnifiedDashboard() {
 
 		try {
 			if (modalType === "CREATE_BATCH") {
-				if (!newBatch.expiration) {
+				if (!newBatch.expiryDate) {
 					showToast("Prosím, zadajte dátum exspirácie.", "error");
 					return;
 				}
@@ -678,6 +693,19 @@ export default function UnifiedDashboard() {
 								size={20}
 								className={`${isRefreshing ? "text-black animate-spin" : "text-gray-400 group-hover:text-black"} transition-colors`}
 							/>
+						</button>
+						<button
+							onClick={handleSyncCatalog}
+							className="flex items-center space-x-2 px-6 h-[60px] bg-white border-2 border-gray-100 rounded-[2rem] hover:border-black transition-all group shadow-xl shadow-gray-200/10"
+							title="Synchronizovať katalóg liekov z blockchainu"
+						>
+							<History
+								size={18}
+								className="text-gray-400 group-hover:text-black transition-colors"
+							/>
+							<span className="text-xs font-black uppercase tracking-widest text-black">
+								Sync Katalóg
+							</span>
 						</button>
 						{user.role === "manufacturer" && !isRegulator && (
 							<button

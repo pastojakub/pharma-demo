@@ -44,23 +44,25 @@ sudo docker-compose -f docker-compose-net.yaml up -d
 
 successln "Blockchain services are starting."
 
-infoln "3. Starting Backend Services (MariaDB)..."
+infoln "3. Starting Decentralized Backend Services (4 Nodes)..."
 cd ../../backend
-sudo docker-compose up -d
+sudo docker-compose -f docker-compose-decentralized.yaml up -d
 
-successln "Backend database is starting."
+successln "Decentralized backends and databases are starting."
 
 echo "----------------------------------------------------------------"
-successln "NETWORK AND DATABASE SERVICES ARE UP!"
+successln "FULL DECENTRALIZED SYSTEM IS UP!"
 echo "----------------------------------------------------------------"
-echo "To start the application components:"
+echo "Organizations are available at:"
+echo -e "  ${YELLOW}Manufacturer (Vyrobca):${NC} http://localhost:3001"
+echo -e "  ${YELLOW}Pharmacy A (Lekarena):${NC} http://localhost:3002"
+echo -e "  ${YELLOW}Pharmacy B (LekarenB):${NC} http://localhost:3003"
+echo -e "  ${YELLOW}Regulator (SUKL):${NC}      http://localhost:3004"
 echo ""
-echo -e "  ${YELLOW}Backend:${NC}"
-echo -e "  cd backend && npm run start:dev"
+echo -e "  ${YELLOW}Database UI:${NC}           http://localhost:8080"
 echo ""
 echo -e "  ${YELLOW}Frontend:${NC}"
 echo -e "  cd frontend && npm run dev"
-echo ""
 echo "----------------------------------------------------------------"
 echo "Note: If the blockchain network was previously initialized,"
 echo "your data and channel state should be preserved."
