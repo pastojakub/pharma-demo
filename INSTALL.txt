@@ -1,0 +1,99 @@
+=============================================================================
+             INŠTALAČNÁ PRÍRUČKA: DECENTRALIZOVANÝ SYSTÉM
+=============================================================================
+
+Tento dokument obsahuje presný postup nasadenia a sprevádzkovania 
+vyvinutého decentralizovaného systému. 
+
+1. SYSTÉMOVÉ POŽIADAVKY
+-----------------------------------------------------------------------------
+* Operačný systém: Linux (otestované špecificky pre Ubuntu 24.04 LTS)
+* Operačná pamäť (RAM): Minimálne 16 GB pre zabezpečenie plynulého a 
+  stabilného chodu celej kontajnerovej infraštruktúry.
+
+
+2. INŠTALÁCIA PREREKVIZÍT
+-----------------------------------------------------------------------------
+Pred spustením systému je nevyhnutné pripraviť prostredie a nainštalovať 
+potrebné nástroje. Spustite nasledujúce príkazy v termináli.
+
+KROK 2.1: Inštalácia technológie Docker
+Najskôr pridajte oficiálny repozitár a nainštalujte najnovšiu verziu Dockeru:
+
+  sudo apt update
+  sudo apt install ca-certificates curl
+  sudo install -m 0755 -d /etc/apt/keyrings
+  sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+  sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+  Types: deb
+  URIs: https://download.docker.com/linux/ubuntu
+  Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+  Components: stable
+  Architectures: $(dpkg --print-architecture)
+  Signed-By: /etc/apt/keyrings/docker.asc
+  EOF
+
+  sudo apt update
+  sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin 
+
+KROK 2.2: Nastavenie oprávnení a spustenie Dockeru
+Pridajte svojho používateľa do skupiny docker (namiesto <username> zadajte 
+svoje prihlasovacie meno) a povoľte službu:
+
+  sudo systemctl start docker
+  sudo usermod -a -G docker <username>
+  sudo systemctl enable docker
+
+  (POZNÁMKA: Pre uplatnenie oprávnení môže byť nutné odhlásenie a opätovné 
+  prihlásenie do operačného systému).
+
+KROK 2.3: Vytvorenie symbolického odkazu pre docker-compose
+Keďže nové verzie používajú plugin Docker Compose v2, pre spätnú kompatibilitu 
+(a fungovanie starých názvov príkazov) vytvorte tento odkaz:
+
+  sudo ln -s /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+
+KROK 2.4: Inštalácia Node.js a jazyka Go
+Pre kompiláciu a beh aplikačných vrstiev sú potrebné nástroje Node.js a Golang:
+
+  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+  sudo apt install -y nodejs golang-go
+
+
+3. SPUSTENIE BACKENDU A BLOCKCHAINOVEJ SIETE
+-----------------------------------------------------------------------------
+Základná projektová štruktúra už obsahuje potrebné binárne súbory pre sieť 
+Hyperledger Fabric (v adresári blockchain-network/bin). Hlavný inicializačný 
+skript sa postará o vygenerovanie certifikátov, spustenie 5 peer uzlov, 
+vytvorenie kanála, nasadenie smart kontraktu a spustenie databáz a backend 
+serverov pre každú organizáciu.
+
+V koreňovom adresári projektu spustite:
+
+  chmod +x *.sh
+  ./start-full-system.sh
+
+
+4. SPUSTENIE KLIENTSKEJ APLIKÁCIE (FRONTEND)
+-----------------------------------------------------------------------------
+Prezentačná vrstva je zjednotená do jednej aplikácie, ktorá umožňuje 
+dynamický výber organizácie. 
+
+Otvorte nové okno terminálu a spustite:
+
+  cd ./frontend
+  npm install
+  npm run dev
+
+
+5. POUŽÍVANIE APLIKÁCIE A TESTOVANIE
+-----------------------------------------------------------------------------
+* Prístup: Aplikácia beží na adrese http://localhost:3000
+* Prihlásenie: Na uvítacej obrazovke si vyberiete konkrétnu infraštruktúru 
+  (portál) organizácie, do ktorej sa chcete prihlásiť.
+* Tip pre testovanie: Ak chcete sledovať tok liečiv v reálnom čase z pohľadu 
+  viacerých aktérov súčasne (napr. Výrobca a Lekáreň), otvorte si ďalšie 
+  portály v okne inkognito vo webovom prehliadači. Zabránite tak nežiaducemu 
+  prepisovaniu cookies a relácií medzi rôznymi API portami.
