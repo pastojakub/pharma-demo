@@ -9,8 +9,8 @@ CC_SRC_PATH="./chaincode"
 CC_SRC_LANGUAGE="typescript"
 
 # Increment these for every update
-CC_VERSION="0.3"
-CC_SEQUENCE="3"
+CC_VERSION="0.1"
+CC_SEQUENCE="1"
 
 # 1. Build and Package Chaincode
 echo "Building chaincode..."

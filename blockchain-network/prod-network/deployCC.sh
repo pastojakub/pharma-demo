@@ -7,8 +7,8 @@ CHANNEL_NAME="pharma-global-channel"
 CC_NAME="drug"
 CC_SRC_PATH="../../chaincode"
 CC_SRC_LANGUAGE="typescript"
-CC_VERSION="0.2"
-CC_SEQUENCE="2"
+CC_VERSION="0.1"
+CC_SEQUENCE="1"
 
 
 DELAY="3"

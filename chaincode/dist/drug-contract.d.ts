@@ -21,6 +21,7 @@ export declare class DrugContract extends Contract {
     querySubBatches(ctx: Context, batchID: string): Promise<string>;
     readDrugDefinition(ctx: Context, id: string): Promise<Uint8Array>;
     readBatch(ctx: Context, batchID: string): Promise<Uint8Array>;
+    verifyBatch(ctx: Context, batchID: string): Promise<Uint8Array>;
     readPrivateOrder(ctx: Context, requestID: string, pharmacyMsp: string): Promise<Uint8Array>;
     GetAllDrugDefinitions(ctx: Context): Promise<string>;
     GetAllDrugs(ctx: Context): Promise<string>;

@@ -487,6 +487,9 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
     async readBatch(ctx, batchID) {
         return await ctx.stub.getState(batchID);
     }
+    async verifyBatch(ctx, batchID) {
+        return await ctx.stub.getState(batchID);
+    }
     async readPrivateOrder(ctx, requestID, pharmacyMsp) {
         const collection = this.getCollectionName(ctx, pharmacyMsp);
         return await ctx.stub.getPrivateData(collection, requestID);
@@ -639,6 +642,12 @@ __decorate([
     __metadata("design:paramtypes", [fabric_contract_api_1.Context, String]),
     __metadata("design:returntype", Promise)
 ], DrugContract.prototype, "readBatch", null);
+__decorate([
+    (0, fabric_contract_api_1.Transaction)(false),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [fabric_contract_api_1.Context, String]),
+    __metadata("design:returntype", Promise)
+], DrugContract.prototype, "verifyBatch", null);
 __decorate([
     (0, fabric_contract_api_1.Transaction)(false),
     __metadata("design:type", Function),

@@ -763,6 +763,11 @@ export class DrugContract extends Contract {
 	}
 
 	@Transaction(false)
+	public async verifyBatch(ctx: Context, batchID: string): Promise<Uint8Array> {
+		return await ctx.stub.getState(batchID);
+	}
+
+	@Transaction(false)
 	public async readPrivateOrder(
 		ctx: Context,
 		requestID: string,
