@@ -48,6 +48,11 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
               const totalQty = group.batches.reduce((sum: number, b: Batch) => sum + b.quantity, 0);
               const unit = group.batches[0]?.unit || 'ks';
               
+              const galleryFile = group.drug?.files?.find((f: any) => f.category === 'GALLERY');
+              const imageUrl = galleryFile 
+                ? (galleryFile.url.startsWith('http') ? galleryFile.url : backendUrl + galleryFile.url)
+                : null;
+
               return (
                 <tr 
                   key={drugId} 
@@ -57,8 +62,8 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                   <td className="px-10 py-6">
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm border border-gray-100 overflow-hidden group-hover:scale-105 transition-all">
-                        {group.drug?.files?.find((f: any) => f.category === 'GALLERY') ? (
-                          <img src={backendUrl + group.drug.files.find((f: any) => f.category === 'GALLERY').url} className="w-full h-full object-cover"/>
+                        {imageUrl ? (
+                          <img src={imageUrl} className="w-full h-full object-cover"/>
                         ) : (
                           <ImageIcon className="text-gray-300" size={20}/>
                         )}

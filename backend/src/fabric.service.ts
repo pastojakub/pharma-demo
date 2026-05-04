@@ -18,6 +18,7 @@ import * as crypto from 'crypto';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { PrismaService } from './prisma.service';
+import { IpfsService } from './ipfs.service';
 
 @Injectable()
 export class FabricService implements OnModuleInit, OnModuleDestroy {
@@ -35,7 +36,8 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private prisma: PrismaService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    private ipfsService: IpfsService
   ) {
     this.mspId = this.configService.get<string>('FABRIC_MSP_ID') || 'VyrobcaMSP';
     this.orgName = this.getOrgName(this.mspId);
@@ -489,7 +491,7 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
           await this.prisma.file.create({
             data: {
               category: 'OTHER', cid: f.cid,
-              url: `https://gateway.pinata.cloud/ipfs/${f.cid}`,
+              url: this.ipfsService.getGatewayUrl(f.cid),
               name: f.name, type: f.type, size: f.size, orderRequestId: order.id
             }
           });

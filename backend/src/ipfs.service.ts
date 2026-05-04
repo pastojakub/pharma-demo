@@ -29,6 +29,13 @@ export class IpfsService implements OnModuleInit {
     }
   }
 
+  getGatewayUrl(cid: string): string {
+    const gateway =
+      this.configService.get<string>('PINATA_GATEWAY') ||
+      'gateway.pinata.cloud';
+    return `https://${gateway}/ipfs/${cid}`;
+  }
+
   async uploadFile(
     filePath: string,
     originalName: string,
@@ -45,12 +52,12 @@ export class IpfsService implements OnModuleInit {
         const upload = await (this.pinata.upload.public as any).file(file);
 
         this.logger.log(
-          `✔ File ${originalName} pinned to IPFS: ${upload.ipfs_hash}`,
+          `✔ File ${originalName} pinned to IPFS: ${upload.cid}`,
         );
 
         return {
-          cid: upload.ipfs_hash,
-          url: `https://${this.configService.get('PINATA_GATEWAY') || 'gateway.pinata.cloud'}/ipfs/${upload.ipfs_hash}`,
+          cid: upload.cid,
+          url: this.getGatewayUrl(upload.cid),
         };
       } catch (error) {
         this.logger.error(`Failed to upload to IPFS: ${error.message}`);

@@ -406,10 +406,10 @@ export const ActionModalContent: React.FC<ActionModalContentProps> = ({
 										<div
 											key={i}
 											className="flex-shrink-0 w-48 aspect-square bg-gray-100 rounded-3xl overflow-hidden border border-gray-200 relative cursor-pointer active:scale-95 transition-transform"
-											onClick={() => setSelectedImage && setSelectedImage(backendUrl + f.url)}
+											onClick={() => setSelectedImage && setSelectedImage(f.url.startsWith('http') ? f.url : backendUrl + f.url)}
 										>
 											<img
-												src={backendUrl + f.url}
+												src={f.url.startsWith('http') ? f.url : backendUrl + f.url}
 												className="w-full h-full object-cover transition-transform hover:scale-110"
 											/>
 											<div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-[10px] p-2 text-center">
@@ -443,10 +443,11 @@ export const ActionModalContent: React.FC<ActionModalContentProps> = ({
 						) && (
 							<a
 								href={
-									backendUrl +
 									selectedDrug.files.find(
 										(f) => f.category === "LEAFLET",
-									)!.url
+									)!.url.startsWith('http') 
+										? selectedDrug.files.find((f) => f.category === "LEAFLET")!.url
+										: backendUrl + selectedDrug.files.find((f) => f.category === "LEAFLET")!.url
 								}
 								target="_blank"
 								className="flex items-center justify-between p-8 bg-gray-50 border-2 border-gray-100 rounded-[2.5rem] group hover:bg-black transition-all shadow-lg shadow-gray-100/50"
@@ -784,7 +785,7 @@ export const ActionModalContent: React.FC<ActionModalContentProps> = ({
 								<div className="flex overflow-x-auto gap-3 pb-2 custom-scrollbar">
 									{newDrug.gallery.map((img: any, idx: number) => (
 										<div key={idx} className="flex-shrink-0 w-20 h-20 relative group rounded-xl overflow-hidden border">
-											<img src={backendUrl + img.url} className="w-full h-full object-cover" />
+											<img src={img.url.startsWith('http') ? img.url : backendUrl + img.url} className="w-full h-full object-cover" />
 											<button 
 												onClick={() => setNewDrug({...newDrug, gallery: newDrug.gallery.filter((_:any, i:number) => i !== idx)})}
 												className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"

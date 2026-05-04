@@ -667,7 +667,7 @@ export default function UnifiedDashboard() {
 
 	// Open Viewer Helper
 	const openViewer = (url: string, gallery: any[]) => {
-		const urls = gallery.map(f => backendUrl + f.url);
+		const urls = gallery.map(f => f.url.startsWith('http') ? f.url : backendUrl + f.url);
 		const idx = urls.indexOf(url);
 		setViewerGallery(urls);
 		setViewerIndex(idx >= 0 ? idx : 0);

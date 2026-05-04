@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { FabricService } from './fabric.service';
 import { PrismaService } from './prisma.service';
+import { IpfsService } from './ipfs.service';
 
 @Injectable()
 export class SyncService implements OnModuleInit {
@@ -9,6 +10,7 @@ export class SyncService implements OnModuleInit {
   constructor(
     private fabricService: FabricService,
     private prisma: PrismaService,
+    private ipfsService: IpfsService,
   ) {}
 
   async onModuleInit() {
@@ -138,7 +140,7 @@ export class SyncService implements OnModuleInit {
            if (def.leaflet) {
              filesToCreate.push({
                category: 'LEAFLET', cid: def.leaflet.cid,
-               url: `https://gateway.pinata.cloud/ipfs/${def.leaflet.cid}`,
+               url: this.ipfsService.getGatewayUrl(def.leaflet.cid),
                name: def.leaflet.name, type: def.leaflet.type, size: def.leaflet.size, drugCatalogId: drug.id
              });
            }
@@ -146,7 +148,7 @@ export class SyncService implements OnModuleInit {
              for (const f of def.gallery) {
                filesToCreate.push({
                  category: 'GALLERY', cid: f.cid,
-                 url: `https://gateway.pinata.cloud/ipfs/${f.cid}`,
+                 url: this.ipfsService.getGatewayUrl(f.cid),
                  name: f.name, type: f.type, size: f.size, drugCatalogId: drug.id
                });
              }
@@ -218,7 +220,7 @@ export class SyncService implements OnModuleInit {
                   await this.prisma.file.create({
                     data: {
                       category: 'OTHER', cid: f.cid,
-                      url: `https://gateway.pinata.cloud/ipfs/${f.cid}`,
+                      url: this.ipfsService.getGatewayUrl(f.cid),
                       name: f.name, type: f.type, size: f.size, orderRequestId: order.id
                     }
                   });
