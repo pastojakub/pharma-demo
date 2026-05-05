@@ -30,7 +30,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     if (token) {
       try {
-        // Simple base64 decode for the payload
         const base64Url = token.split('.')[1];
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
         const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {

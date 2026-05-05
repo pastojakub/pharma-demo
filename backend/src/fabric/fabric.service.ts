@@ -153,7 +153,6 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
     return this.configService.get<string>('FABRIC_CHAINCODE') || this.config?.cc || 'drug-traceability';
   }
 
-  // ─── Transaction execution ────────────────────────────────────────────────
 
   async executeTransaction(
     name: string,
@@ -195,7 +194,6 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  // ─── Response decoding ────────────────────────────────────────────────────
 
   public decodeResult(resultBytes: Uint8Array | null, rawValue?: any): any {
     if ((!resultBytes || resultBytes.length === 0) && typeof rawValue === 'undefined') return undefined;
@@ -256,7 +254,6 @@ export class FabricService implements OnModuleInit, OnModuleDestroy {
     return search(obj);
   }
 
-  // ─── Business call wrappers ───────────────────────────────────────────────
 
   async initBatch(uID: number, bID: string, dID: string, name: string, m: string, exp: string, q: number, unit: string, p: number, meta?: string) {
     const transient = { price: Buffer.from(p.toString()), quantity: Buffer.from(q.toString()), metadata: Buffer.from(meta || '') };

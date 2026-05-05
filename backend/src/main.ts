@@ -12,17 +12,14 @@ async function bootstrap() {
   dotenv.config();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Use Helmet for secure HTTP headers
   app.use(
     helmet({
       crossOriginResourcePolicy: false,
     }),
   );
 
-  // Global Filter: Sanitize Errors (Prevents info leakage)
   app.useGlobalFilters(new BlockchainExceptionFilter());
 
-  // Global Interceptor: Mask sensitive data in logs
   app.useGlobalInterceptors(new LoggingInterceptor());
 
   app.useGlobalPipes(
@@ -44,7 +41,6 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Accept, Authorization',
   });
 
-  // Serve static files from 'uploads' folder
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
   });

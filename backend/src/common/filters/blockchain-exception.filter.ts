@@ -36,7 +36,6 @@ export class BlockchainExceptionFilter implements ExceptionFilter {
       
       const rawMessage = exception.message.toLowerCase();
       
-      // Sanitize and translate common blockchain errors
       if (rawMessage.includes('already exists')) {
         message = 'Záznam s týmto ID už na blockchaine existuje.';
       } else if (rawMessage.includes('not found')) {
@@ -50,12 +49,10 @@ export class BlockchainExceptionFilter implements ExceptionFilter {
       }
     }
 
-    // Log the FULL error internally for developers
     this.logger.error(
       `[${errorType}] ${request.method} ${request.url}\nDetail: ${exception.message}\nStack: ${exception.stack}`,
     );
 
-    // Return only SANITIZED data to the client
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),

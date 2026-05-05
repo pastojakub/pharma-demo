@@ -43,7 +43,6 @@ export class IpfsService implements OnModuleInit {
     if (this.useIpfs && this.pinata) {
       try {
         const fileBuffer = fs.readFileSync(filePath);
-        // Correct Pinata v2 SDK file upload with type bypass for problematic SDK definitions
         const blob = new Blob([fileBuffer]);
         const file = new File([blob], originalName, {
           type: 'application/octet-stream',

@@ -24,7 +24,6 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Check if user should be redirected on 401
     if (error.response?.status === 401) {
       console.warn('Unauthorized! Logging out and redirecting...');
       authCookies.clear();
@@ -34,7 +33,6 @@ api.interceptors.response.use(
       }
     }
     
-    // We reject the error so it can be caught and handled locally (e.g. via toast)
     return Promise.reject(error);
   }
 );

@@ -52,13 +52,11 @@ export class UploadController {
       throw new BadRequestException('Súbor nebol nahraný.');
     }
 
-    // Secondary Check: Verify content via magic bytes
     const type = await fromBuffer.fromFile(file.path);
     if (!type || !ALLOWED_MIME_TYPES.includes(type.mime)) {
        throw new BadRequestException('Detegovaný neplatný obsah súboru (MIME mismatch).');
     }
 
-    // NEW: Upload to IPFS
     const ipfsData = await this.ipfsService.uploadFile(file.path, file.originalname);
 
     return {
@@ -106,7 +104,6 @@ export class UploadController {
             throw new BadRequestException(`Súbor ${file.originalname} má neplatný obsah.`);
         }
 
-        // NEW: Upload to IPFS
         const ipfsData = await this.ipfsService.uploadFile(file.path, file.originalname);
         results.push({
           url: ipfsData.url,

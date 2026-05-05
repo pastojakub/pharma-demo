@@ -27,12 +27,9 @@ export default function VerifyPage() {
     setIntegrity(null);
     
     try {
-      // 1. Basic Verify (Public)
       const vRes = await api.get(`/drugs/${batchID}/verify`);
       setResult(vRes.data);
 
-      // Both endpoints handle auth gracefully: history returns [] for unauthenticated,
-      // integrity returns masked data. Call both always; the interceptor adds the token if present.
       const hasToken = !!Cookies.get('auth_token');
 
       try {

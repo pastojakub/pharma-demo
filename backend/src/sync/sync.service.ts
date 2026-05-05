@@ -22,7 +22,6 @@ export class SyncService implements OnModuleInit {
     this.startContractEventListener();
   }
 
-  // ─── Blockchain listeners ─────────────────────────────────────────────────
 
   private async initialSyncWithRetry() {
     try {
@@ -102,7 +101,6 @@ export class SyncService implements OnModuleInit {
     }
   }
 
-  // ─── Full mirror sync ─────────────────────────────────────────────────────
 
   public async syncRecentChanges() {
     if (this.isSyncing) {
@@ -262,15 +260,12 @@ export class SyncService implements OnModuleInit {
     const finalStatus = o.status === 'APPROVED' ? 'APPROVED' : (o.status === 'REJECTED' ? 'REJECTED' : 'PENDING');
     const currentPrice = Number(o.priceOffer);
     
-    // Get the exact history from blockchain
     const bcOffers = o.priceOffers || [];
     
-    // Fallback if array is missing but price exists
     if (bcOffers.length === 0 && currentPrice) {
        bcOffers.push({ price: currentPrice, timestamp: Math.floor(Date.now() / 1000) });
     }
 
-    // Load existing offers efficiently
     const dbOffers = await this.prisma.priceOffer.findMany({
       where: { batchID: o.requestId }
     });
@@ -286,7 +281,6 @@ export class SyncService implements OnModuleInit {
           offerStatus = priceVal === currentPrice ? finalStatus : 'HISTORY';
        }
 
-       // Find matching DB offer that hasn't been claimed yet
        const matchIndex = dbOffers.findIndex(db => Number(db.price) === priceVal && !validDbIds.has(db.id));
        
        if (matchIndex !== -1) {
@@ -313,7 +307,6 @@ export class SyncService implements OnModuleInit {
        }
     }
 
-    // Sweep any leftover DB rows that weren't matched to the blockchain array
     const idsToDelete = dbOffers.filter(db => !validDbIds.has(db.id)).map(db => db.id);
     if (idsToDelete.length > 0) {
       await this.prisma.priceOffer.deleteMany({
@@ -322,7 +315,6 @@ export class SyncService implements OnModuleInit {
     }
   }
 
-  // ─── Drug / order sync ────────────────────────────────────────────────────
 
   public async syncDrugWithDB(batchID: string) {
     try {
@@ -417,7 +409,6 @@ export class SyncService implements OnModuleInit {
     }
   }
 
-  // ─── Integrity checks ─────────────────────────────────────────────────────
 
   public async verifyIntegrity(batchID: string) {
     const db = await this.prisma.drug.findUnique({ where: { batchID } });
@@ -451,12 +442,10 @@ export class SyncService implements OnModuleInit {
     if (db.drugName !== bc.drugName) mismatches.push(`Názov lieku: DB(${db.drugName}) vs BC(${bc.drugName})`);
     if (db.manufacturerOrg !== bc.manufacturerOrg) mismatches.push(`Výrobca: DB(${db.manufacturerOrg}) vs BC(${bc.manufacturerOrg})`);
 
-    // DB has post-approval statuses that don't exist on BC (BC stays APPROVED after fulfillment)
     const POST_APPROVAL = ['ORDERED', 'FULFILLED', 'PROCESSING_FULFILLMENT'];
     const effectiveDbStatus = POST_APPROVAL.includes(db.status) ? 'APPROVED' : db.status;
     if (effectiveDbStatus !== bc.status) mismatches.push(`Stav: DB(${db.status}) vs BC(${bc.status})`);
 
-    // Price offer checks
     const dbOffers = await this.prisma.priceOffer.findMany({ where: { batchID: requestId }, orderBy: { createdAt: 'asc' } });
     const bcOffers: { price: number; timestamp?: string }[] = bc.priceOffers || [];
 

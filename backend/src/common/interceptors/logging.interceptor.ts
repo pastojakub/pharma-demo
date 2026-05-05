@@ -20,7 +20,6 @@ export class LoggingInterceptor implements NestInterceptor {
         
         const maskedResponse = this.maskSensitiveData(response);
 
-        // Professional logging format: masks commercial data and prevents log flooding
         this.logger.debug(
           `${method} ${url} ${statusCode} - ${delay}ms\n[REQ] ${JSON.stringify(maskedBody)}\n[RES] ${JSON.stringify(maskedResponse)}`,
         );
@@ -31,7 +30,6 @@ export class LoggingInterceptor implements NestInterceptor {
   private maskSensitiveData(data: any): any {
     if (!data || typeof data !== 'object') return data;
     
-    // Deep clone to avoid mutating actual objects in memory
     let cloned;
     try {
       cloned = JSON.parse(JSON.stringify(data));

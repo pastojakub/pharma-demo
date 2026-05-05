@@ -29,7 +29,6 @@ export class DrugCatalogController {
   @Post('sync')
   async syncWithBlockchain(@Request() req) {
     try {
-      // Trigger full decentralized mirror sync
       await this.syncService.syncRecentChanges();
       return { success: true, message: 'Synchronizácia s blockchainom bola spustená.' };
     } catch (e) {
@@ -62,7 +61,6 @@ export class DrugCatalogController {
       include: { files: true }
     });
 
-    // NEW: Sync with Blockchain for Decentralization
     try {
       await this.fabricService.addDrugDefinition(req.user.userId, drug);
     } catch (e) {
@@ -104,7 +102,6 @@ export class DrugCatalogController {
       include: { files: true }
     });
 
-    // NEW: Update on Blockchain
     try {
       await this.fabricService.addDrugDefinition(req.user.userId, drug);
     } catch (e) {
