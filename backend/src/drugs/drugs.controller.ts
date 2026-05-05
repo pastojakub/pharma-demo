@@ -33,8 +33,15 @@ export class DrugsController {
   async getAll(@Request() req) {
     const { role, org } = req.user;
     if (role === 'regulator') return this.prisma.drug.findMany({ orderBy: { createdAt: 'desc' } });
+    
     return this.prisma.drug.findMany({
-      where: { ownerOrg: org, NOT: [{ status: 'SOLD' }, { quantity: 0 }] },
+      where: {
+        ownerOrg: org,
+        OR: [
+          { status: 'RECALLED' },
+          { NOT: [{ status: 'SOLD' }, { quantity: 0 }] }
+        ]
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
