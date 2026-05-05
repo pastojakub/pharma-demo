@@ -76,7 +76,29 @@ V koreňovom adresári projektu spustite:
   ./start-full-system.sh
 
 
-4. SPUSTENIE KLIENTSKEJ APLIKÁCIE (FRONTEND)
+4. BEŽNÁ SPRÁVA SYSTÉMU (ZASTAVENIE, SPUSTENIE, AKTUALIZÁCIA)
+-----------------------------------------------------------------------------
+Na rozdiel od `start-full-system.sh`, ktorý všetko zmaže a vytvorí sieť 
+úplne odznova (vrátane prvotného nasadenia chaincode-u pomocou `deployCC.sh`), 
+na bežnú prácu a vývoj slúžia tieto skripty:
+
+* Zastavenie systému bez straty dát:
+  Zastaví všetky bežiace kontajnery (blockchain aj backendy).
+  Príkaz: ./down-system.sh
+
+* Opätovné spustenie systému (zachovanie dát):
+  Spustí existujúce kontajnery a obnoví ich stav presne tam, kde skončili.
+  Príkaz: ./up-system.sh
+
+* Aktualizácia Smart Kontraktu (Chaincode):
+  Ak urobíte zmeny v logike v priečinku `chaincode/`, nemusíte reštartovať 
+  a mazať celú sieť. Otvorte súbor `update-cc.sh`, zvýšte premenné 
+  CC_VERSION a CC_SEQUENCE (napríklad na 0.2 a 2) a spustite ho.
+  Príkaz: ./update-cc.sh
+  Sieť automaticky prebalí, nainštaluje, schváli a nasadí novú verziu kódu.
+
+
+5. SPUSTENIE KLIENTSKEJ APLIKÁCIE (FRONTEND)
 -----------------------------------------------------------------------------
 Prezentačná vrstva je zjednotená do jednej aplikácie, ktorá umožňuje 
 dynamický výber organizácie. 
@@ -88,7 +110,7 @@ Otvorte nové okno terminálu a spustite:
   npm run dev
 
 
-5. POUŽÍVANIE APLIKÁCIE A TESTOVANIE
+6. POUŽÍVANIE APLIKÁCIE A TESTOVANIE
 -----------------------------------------------------------------------------
 * Prístup: Aplikácia beží na adrese http://localhost:3000
 * Prihlásenie: Na uvítacej obrazovke si vyberiete konkrétnu infraštruktúru 
