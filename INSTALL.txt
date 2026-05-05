@@ -42,9 +42,9 @@ KROK 2.2: Nastavenie oprávnení a spustenie Dockeru
 Pridajte svojho používateľa do skupiny docker (namiesto <username> zadajte 
 svoje prihlasovacie meno) a povoľte službu:
 
-  sudo systemctl start docker
-  sudo usermod -a -G docker <username>
-  sudo systemctl enable docker
+sudo systemctl start docker
+sudo usermod -a -G docker <username>
+sudo systemctl enable docker
 
   (POZNÁMKA: Pre uplatnenie oprávnení môže byť nutné odhlásenie a opätovné 
   prihlásenie do operačného systému).
@@ -53,13 +53,13 @@ KROK 2.3: Vytvorenie symbolického odkazu pre docker-compose
 Keďže nové verzie používajú plugin Docker Compose v2, pre spätnú kompatibilitu 
 (a fungovanie starých názvov príkazov) vytvorte tento odkaz:
 
-  sudo ln -s /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+sudo ln -s /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
 
 KROK 2.4: Inštalácia Node.js a jazyka Go
 Pre kompiláciu a beh aplikačných vrstiev sú potrebné nástroje Node.js a Golang:
 
-  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-  sudo apt install -y nodejs golang-go
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs golang-go
 
 
 3. SPUSTENIE BACKENDU A BLOCKCHAINOVEJ SIETE
@@ -72,8 +72,8 @@ serverov pre každú organizáciu.
 
 V koreňovom adresári projektu spustite:
 
-  chmod +x *.sh
-  ./start-full-system.sh
+chmod +x *.sh
+./start-full-system.sh
 
 
 4. BEŽNÁ SPRÁVA SYSTÉMU (ZASTAVENIE, SPUSTENIE, AKTUALIZÁCIA)
@@ -105,9 +105,9 @@ dynamický výber organizácie.
 
 Otvorte nové okno terminálu a spustite:
 
-  cd ./frontend
-  npm install
-  npm run dev
+cd ./frontend
+npm install
+npm run dev
 
 
 6. POUŽÍVANIE APLIKÁCIE A TESTOVANIE
