@@ -36,25 +36,25 @@ export const DrugInfoModal: React.FC<DrugInfoModalProps> = ({
 }) => {
   return (
     <>
-      <div className="flex bg-gray-50 p-1.5 rounded-2xl mb-10 border border-gray-100">
+      <div className="flex bg-gray-50 p-1.5 rounded-2xl mb-10 border border-gray-100 overflow-x-auto custom-scrollbar">
         <button
           onClick={() => setModalTab('details')}
-          className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center transition-all ${modalTab === 'details' ? 'bg-white text-black shadow-sm' : 'text-gray-400'}`}
+          className={`flex-1 min-w-[140px] py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center transition-all whitespace-nowrap ${modalTab === 'details' ? 'bg-white text-black shadow-sm' : 'text-gray-400'}`}
         >
-          <ClipboardList size={16} className="mr-2" /> Informácie
+          <ClipboardList size={16} className="mr-2 flex-shrink-0" /> Informácie
         </button>
         <button
           onClick={() => setModalTab('batches')}
-          className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center transition-all ${modalTab === 'batches' ? 'bg-white text-black shadow-sm' : 'text-gray-400'}`}
+          className={`flex-1 min-w-[140px] py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center transition-all whitespace-nowrap ${modalTab === 'batches' ? 'bg-white text-black shadow-sm' : 'text-gray-400'}`}
         >
-          <Box size={16} className="mr-2" /> Šarže
+          <Box size={16} className="mr-2 flex-shrink-0" /> Šarže
         </button>
         {user?.role === 'manufacturer' && (
           <button
             onClick={() => setModalTab('pricing')}
-            className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center transition-all ${modalTab === 'pricing' ? 'bg-white text-black shadow-sm' : 'text-gray-400'}`}
+            className={`flex-1 min-w-[140px] py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center transition-all whitespace-nowrap ${modalTab === 'pricing' ? 'bg-white text-black shadow-sm' : 'text-gray-400'}`}
           >
-            <ShoppingCart size={16} className="mr-2" /> Cenník
+            <ShoppingCart size={16} className="mr-2 flex-shrink-0" /> Cenník
           </button>
         )}
       </div>
@@ -192,7 +192,8 @@ export const DrugInfoModal: React.FC<DrugInfoModalProps> = ({
 
       {modalTab === 'pricing' && (
         <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
-          <table className="w-full text-left">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left whitespace-nowrap">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-8 py-4 text-[10px] font-black uppercase text-gray-400">Lekáreň</th>
@@ -228,6 +229,7 @@ export const DrugInfoModal: React.FC<DrugInfoModalProps> = ({
               )}
             </tbody>
           </table>
+        </div>
         </div>
       )}
     </>

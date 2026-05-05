@@ -34,7 +34,8 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
           </div>
         </div>
         
-        <table className="w-full text-left">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left whitespace-nowrap">
           <thead className="bg-gray-50/50 border-b border-gray-200">
             <tr>
               <th className="px-10 py-6 text-[10px] font-black uppercase text-gray-400">Produkt</th>
@@ -131,6 +132,7 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
             })}
           </tbody>
         </table>
+        </div>
         
         {groupedData.length === 0 && (
           <div className="py-32 text-center">

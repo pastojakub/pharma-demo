@@ -32,7 +32,7 @@ export const IncomingSection: React.FC<IncomingSectionProps> = ({
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left whitespace-nowrap">
             <thead className="bg-gray-50/50 border-b border-gray-200">
               <tr>
                 <th className="px-10 py-6 text-[10px] font-black uppercase text-gray-400">Produkt / Šarža</th>

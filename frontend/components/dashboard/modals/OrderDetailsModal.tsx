@@ -140,7 +140,8 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           História cenových ponúk
         </label>
         <div className="bg-white border-2 border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-          <table className="w-full text-left">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left whitespace-nowrap">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 <th className="px-8 py-4 text-[10px] font-black uppercase text-gray-400">Dátum</th>
@@ -180,6 +181,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               )}
             </tbody>
           </table>
+        </div>
         </div>
       </div>
 

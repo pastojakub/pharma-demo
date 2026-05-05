@@ -20,7 +20,8 @@ export const OrdersSection: React.FC<OrdersSectionProps> = ({
 }) => {
   return (
     <div className="bg-white rounded-[3rem] border border-gray-200 overflow-hidden shadow-xl animate-in fade-in duration-500">
-      <table className="w-full text-left">
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left whitespace-nowrap">
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
             <th className="px-10 py-6 text-[10px] font-black uppercase text-gray-400">ID Požiadavky</th>
@@ -133,6 +134,7 @@ export const OrdersSection: React.FC<OrdersSectionProps> = ({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 };

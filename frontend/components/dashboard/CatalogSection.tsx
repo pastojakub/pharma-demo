@@ -19,7 +19,8 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
       <h3 className="text-xl font-black text-gray-900 tracking-tight">Celý katalóg liečiv</h3>
       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Všetky schválené produkty v sieti</p>
     </div>
-    <table className="w-full text-left">
+    <div className="overflow-x-auto custom-scrollbar">
+      <table className="w-full text-left whitespace-nowrap">
       <thead className="bg-gray-50/50 border-b border-gray-200">
         <tr>
           <th className="px-10 py-6 text-[10px] font-black uppercase text-gray-400">Produkt</th>
@@ -74,5 +75,6 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
           })}
       </tbody>
     </table>
+    </div>
   </div>
 );
