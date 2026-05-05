@@ -27,7 +27,12 @@ The project is divided into several key components:
 
 ## 🏁 Quick Start
 
-1.  **Initialize the Blockchain Network and decentralized setup**:
+1.  **Configure Environment Variables**:
+    - Copy `.env.example` to `.env` in `blockchain-network/prod-network/` and `backend/`.
+    - Set up a Pinata IPFS account, and update `PINATA_GATEWAY` and `PINATA_JWT` in the backend `.env`. **Important:** The Pinata API key must have "Write" permissions for files, and at least "Read" permissions for other endpoints.
+    - See `INSTALL.txt` for more details.
+
+2.  **Initialize the Blockchain Network and decentralized setup**:
 
     ```bash
     chmod +x *.sh

@@ -79,7 +79,7 @@ Pred samotným spustením je nutné vytvoriť .env konfiguračné súbory. V pro
    Následne je nutné vytvoriť si účet na službe Pinata ktorá slúži ako IPFS úložisko. 
    V administračnom rozhraní prejdeme do sekcie Gateways, skopírujeme celú adresu 
    brány a vložíme ju do konfiguračného súboru .env v priečinku backend k premennej PINATA_GATEWAY. 
-   Potom vytvoríme API kľúč, skopírujeme hodnotu JWT Secret a vložíme ju do toho istého .env 
+   Potom vytvoríme API kľúč (dôležité: pri vytváraní musí mať tento kľúč povolené oprávnenie na zápis - "Write" permission na súbory/Files, pričom ostatné oprávnenia by mali byť nastavené aspoň na čítanie - "Read"). Skopírujeme hodnotu JWT Secret a vložíme ju do toho istého .env 
    súboru k premennej PINATA_JWT.
 
 
