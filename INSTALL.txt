@@ -62,6 +62,27 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs golang-go
 
 
+KROK 2.5: Konfigurácia prostredia (.env súbory)
+Pred samotným spustením je nutné vytvoriť .env konfiguračné súbory. V projekte sa nachádzajú vzorové súbory (.env.example), ktoré je potrebné skopírovať a správne naplniť:
+
+1. Blockchain sieť:
+   Skopírujte súbor blockchain-network/prod-network/.env.example do blockchain-network/prod-network/.env
+   (Tento súbor zvyčajne nevyžaduje zmeny, definuje len sieťové porty a verzie pre Fabric).
+   Príkaz: cp ./blockchain-network/prod-network/.env.example ./blockchain-network/prod-network/.env
+
+2. Backend:
+   Skopírujte súbor backend/.env.example do backend/.env
+   Príkaz: cp ./backend/.env.example ./backend/.env
+   Tento súbor je nutné správne naplniť:
+   - JWT_SECRET: Bezpečný tajný kľúč pre generovanie tokenov aplikácie (vložte dlhý náhodný reťazec).
+   
+   Následne je nutné vytvoriť si účet na službe Pinata ktorá slúži ako IPFS úložisko. 
+   V administračnom rozhraní prejdeme do sekcie Gateways, skopírujeme celú adresu 
+   brány a vložíme ju do konfiguračného súboru .env v priečinku backend k premennej PINATA_GATEWAY. 
+   Potom vytvoríme API kľúč, skopírujeme hodnotu JWT Secret a vložíme ju do toho istého .env 
+   súboru k premennej PINATA_JWT.
+
+
 3. SPUSTENIE BACKENDU A BLOCKCHAINOVEJ SIETE
 -----------------------------------------------------------------------------
 Základná projektová štruktúra už obsahuje potrebné binárne súbory pre sieť 
