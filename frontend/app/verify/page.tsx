@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import Cookies from 'js-cookie';
 import Navbar from '../../components/Navbar';
 import api from '../../lib/api';
-import { Search, ShieldCheck, AlertCircle, Building, Calendar, History, ShieldAlert, Clock, User, Package } from 'lucide-react';
+import { Search, ShieldCheck, AlertCircle, Building, Calendar, ShieldAlert } from 'lucide-react';
 import { Batch, TransactionHistory, IntegrityStatus } from '../../types';
-import { StatusBadge } from '../../components/ui/StatusBadge';
+import { BlockchainTimeline } from '../../components/ui/BlockchainTimeline';
 
 export default function VerifyPage() {
   const [batchID, setBatchID] = useState('');
@@ -30,36 +31,24 @@ export default function VerifyPage() {
       const vRes = await api.get(`/drugs/${batchID}/verify`);
       setResult(vRes.data);
 
-      // Check if user is logged in before calling protected endpoints
-      const hasToken = document.cookie.split('; ').find(row => row.startsWith('auth_token='));
+      // Both endpoints handle auth gracefully: history returns [] for unauthenticated,
+      // integrity returns masked data. Call both always; the interceptor adds the token if present.
+      const hasToken = !!Cookies.get('auth_token');
+
+      try {
+        const iRes = await api.get(`/drugs/${batchID}/verify-integrity`);
+        setIntegrity(iRes.data);
+      } catch {
+        setIntegrity(null);
+      }
 
       if (hasToken) {
-        // 2. History (Protected)
         try {
           const hRes = await api.get(`/drugs/${batchID}/history`);
           setHistory(Array.isArray(hRes.data) ? hRes.data : []);
-        } catch (hErr) {
-          console.log('History restricted or unauthorized.');
+        } catch {
           setHistory([]);
         }
-
-        // 3. Integrity (Protected logic)
-        try {
-          const iRes = await api.get(`/drugs/${batchID}/verify-integrity`);
-          setIntegrity(iRes.data);
-        } catch (iErr) {
-          console.log('Integrity check restricted.');
-          setIntegrity(null);
-        }
-      } else {
-        // Patient view: history is hidden by default, integrity called without auth header (handled by backend masking)
-        try {
-          const iRes = await api.get(`/drugs/${batchID}/verify-integrity`);
-          setIntegrity(iRes.data);
-        } catch (iErr) {
-          setIntegrity(null);
-        }
-        setHistory([]);
       }
 
     } catch (err) {
@@ -198,36 +187,10 @@ export default function VerifyPage() {
                 </div>
               )}
 
-              {/* History Timeline */}
               {history.length > 0 && (
                 <div className="mt-16">
                   <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-10 text-center">Životný cyklus šarže (Blockchain)</h3>
-                  <div className="relative space-y-10 before:absolute before:left-8 before:top-2 before:bottom-2 before:w-1.5 before:bg-gray-100">
-                    {history.map((tx, i) => (
-                      <div key={tx.txId} className="relative pl-20">
-                        <div className="absolute left-5 top-2 w-7 h-7 bg-white border-4 border-black rounded-full z-10 shadow-md"></div>
-                        <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                          <div className="flex justify-between items-start mb-6">
-                            <div>
-                              <div className="flex items-center text-xs text-gray-400 font-bold bg-white px-3 py-1.5 rounded-xl border">
-                                <Clock size={14} className="mr-2"/> 
-                                {new Date((typeof tx.timestamp.seconds === 'number' ? tx.timestamp.seconds : tx.timestamp.seconds.low) * 1000).toLocaleString()}
-                              </div>
-                            </div>
-                            <StatusBadge status={tx.data?.status || 'UNKNOWN'} />
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-black">
-                            <div className="flex items-center text-gray-600 bg-white p-4 rounded-2xl border border-gray-100">
-                              <User size={16} className="mr-3 text-gray-400"/> {tx.data?.ownerOrg || 'N/A'}
-                            </div>
-                            <div className="flex items-center text-gray-600 bg-white p-4 rounded-2xl border border-gray-100">
-                              <Package size={16} className="mr-3 text-gray-400"/> {tx.data?.quantity || 0} {tx.data?.unit}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <BlockchainTimeline history={history} />
                 </div>
               )}
             </div>

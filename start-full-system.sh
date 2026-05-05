@@ -20,7 +20,12 @@ if [ ! -d "blockchain-network" ]; then
 fi
 
 infoln "1. Cleaning up previous network state..."
-cd blockchain-network/prod-network
+
+# First, bring down the backend services that use the fabric_test network
+cd backend
+sudo docker-compose -f docker-compose-decentralized.yaml down -v --remove-orphans || true
+cd ../blockchain-network/prod-network
+
 sudo docker-compose -f docker-compose-net.yaml -f docker-compose-ca.yaml down -v --remove-orphans
 sudo rm -rf organizations channel-artifacts
 successln "Cleanup complete."

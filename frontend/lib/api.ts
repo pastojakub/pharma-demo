@@ -1,5 +1,6 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { authCookies } from './auth-cookies';
 
 const api = axios.create({
   baseURL: typeof window !== 'undefined' ? (localStorage.getItem('api_base_url') || 'http://localhost:3001') : 'http://localhost:3001',
@@ -26,11 +27,8 @@ api.interceptors.response.use(
     // Check if user should be redirected on 401
     if (error.response?.status === 401) {
       console.warn('Unauthorized! Logging out and redirecting...');
-      Cookies.remove('auth_token', { path: '/' });
-      Cookies.remove('user_role', { path: '/' });
-      Cookies.remove('user_email', { path: '/' });
-      Cookies.remove('user_org', { path: '/' });
-      
+      authCookies.clear();
+
       if (typeof window !== 'undefined') {
         window.location.href = '/?error=session_expired';
       }

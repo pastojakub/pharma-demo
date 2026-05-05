@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, ShieldCheck, Zap, Info } from 'lucide-react';
+import { ShieldCheck, Zap, Info } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
 import { OrderRequest, User, DrugDefinition } from '../../types';
 

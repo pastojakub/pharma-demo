@@ -13,9 +13,9 @@ exports.PrivateOrderData = exports.PrivateBatchData = exports.DrugBatch = export
 // drug.ts
 const fabric_contract_api_1 = require("fabric-contract-api");
 let FileMetadata = class FileMetadata {
-    cid = '';
-    name = '';
-    type = '';
+    cid = "";
+    name = "";
+    type = "";
     size = 0;
 };
 exports.FileMetadata = FileMetadata;
@@ -39,9 +39,9 @@ exports.FileMetadata = FileMetadata = __decorate([
     (0, fabric_contract_api_1.Object)()
 ], FileMetadata);
 let FulfillmentLink = class FulfillmentLink {
-    batchID = '';
+    batchID = "";
     quantity = 0;
-    timestamp = '';
+    timestamp = "";
 };
 exports.FulfillmentLink = FulfillmentLink;
 __decorate([
@@ -61,7 +61,7 @@ exports.FulfillmentLink = FulfillmentLink = __decorate([
 ], FulfillmentLink);
 let PriceOfferHistory = class PriceOfferHistory {
     price = 0;
-    timestamp = '';
+    timestamp = "";
 };
 exports.PriceOfferHistory = PriceOfferHistory;
 __decorate([
@@ -76,16 +76,16 @@ exports.PriceOfferHistory = PriceOfferHistory = __decorate([
     (0, fabric_contract_api_1.Object)()
 ], PriceOfferHistory);
 let DrugDefinition = class DrugDefinition {
-    id = '';
-    name = '';
-    composition = '';
-    recommendedDosage = '';
+    id = "";
+    name = "";
+    composition = "";
+    recommendedDosage = "";
     intakeInfo;
     metadata;
     leaflet;
     gallery = [];
-    manufacturer = '';
-    createdAt = '';
+    manufacturer = "";
+    createdAt = "";
 };
 exports.DrugDefinition = DrugDefinition;
 __decorate([
@@ -132,16 +132,16 @@ exports.DrugDefinition = DrugDefinition = __decorate([
     (0, fabric_contract_api_1.Object)()
 ], DrugDefinition);
 let DrugBatch = class DrugBatch {
-    batchID = '';
-    drugID = '';
-    drugName = '';
-    manufacturer = '';
-    ownerOrg = '';
+    batchID = "";
+    drugID = "";
+    drugName = "";
+    manufacturer = "";
+    ownerOrg = "";
     quantity = 0;
     parentBatchID;
-    unit = 'ks';
-    expiryDate = '';
-    status = 'INITIALIZED';
+    unit = "ks";
+    expiryDate = "";
+    status = "INITIALIZED";
 };
 exports.DrugBatch = DrugBatch;
 __decorate([
@@ -188,7 +188,7 @@ exports.DrugBatch = DrugBatch = __decorate([
     (0, fabric_contract_api_1.Object)()
 ], DrugBatch);
 let PrivateBatchData = class PrivateBatchData {
-    batchID = '';
+    batchID = "";
     quantity = 0;
     price = 0;
     metadata;
@@ -214,15 +214,15 @@ exports.PrivateBatchData = PrivateBatchData = __decorate([
     (0, fabric_contract_api_1.Object)()
 ], PrivateBatchData);
 let PrivateOrderData = class PrivateOrderData {
-    requestId = '';
-    drugID = '';
-    drugName = '';
-    manufacturerOrg = '';
-    pharmacyOrg = '';
+    requestId = "";
+    drugID = "";
+    drugName = "";
+    manufacturerOrg = "";
+    pharmacyOrg = "";
     quantity = 0;
-    unit = '';
-    status = 'REQUESTED';
-    createdAt = '';
+    unit = "";
+    status = "REQUESTED";
+    createdAt = "";
     fileAttachments = [];
     priceOffer;
     finalAgreedPrice;

@@ -1,12 +1,17 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
-import { FabricService } from '../fabric.service';
-import { SyncService } from '../sync.service';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request, Logger, SetMetadata } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { FabricService } from '../fabric/fabric.service';
+import { SyncService } from '../sync/sync.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
 import { CreateDrugDefinitionDto } from '../dto/create-drug-definition.dto';
+
+const Roles = (...roles: string[]) => SetMetadata('roles', roles);
 
 @Controller('drug-catalog')
 export class DrugCatalogController {
+  private readonly logger = new Logger(DrugCatalogController.name);
+
   constructor(
     private prisma: PrismaService,
     private fabricService: FabricService,
@@ -32,7 +37,8 @@ export class DrugCatalogController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('manufacturer', 'regulator')
   @Post()
   async create(@Body() body: CreateDrugDefinitionDto, @Request() req) {
     const { files, intakeInfo, metadata, ...drugData } = body;
@@ -60,13 +66,14 @@ export class DrugCatalogController {
     try {
       await this.fabricService.addDrugDefinition(req.user.userId, drug);
     } catch (e) {
-      console.error(`[Blockchain Sync Error] Drug definition not stored on ledger: ${e.message}`);
+      this.logger.error(`Drug definition not stored on ledger: ${e.message}`);
     }
 
     return drug;
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('manufacturer', 'regulator')
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: CreateDrugDefinitionDto, @Request() req) {
     const { files, intakeInfo, metadata, ...drugData } = body;
@@ -101,7 +108,7 @@ export class DrugCatalogController {
     try {
       await this.fabricService.addDrugDefinition(req.user.userId, drug);
     } catch (e) {
-      console.error(`[Blockchain Sync Error] Updated drug definition not stored on ledger: ${e.message}`);
+      this.logger.error(`Updated drug definition not stored on ledger: ${e.message}`);
     }
 
     return drug;

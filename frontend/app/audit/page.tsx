@@ -8,14 +8,15 @@ import { Search, History, AlertTriangle, ShieldAlert, Clock, Layers } from 'luci
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useToast } from '../../components/ToastProvider';
+import { TransactionHistory, Batch } from '../../types';
 
 function AuditContent() {
   const { user, loading } = useAuth();
   const { showToast } = useToast();
   const searchParams = useSearchParams();
   const [batchID, setBatchID] = useState(searchParams.get('id') || '');
-  const [history, setHistory] = useState<any[]>([]);
-  const [subBatches, setSubBatches] = useState<any[]>([]);
+  const [history, setHistory] = useState<TransactionHistory[]>([]);
+  const [subBatches, setSubBatches] = useState<Batch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showRecallModal, setShowRecallModal] = useState(false);
 
@@ -171,7 +172,7 @@ function AuditContent() {
                         <p className="text-2xl font-black text-gray-900">{entry.data?.status}</p>
                         <div className="flex gap-3 mt-3">
                           <p className="text-xs text-gray-400 flex items-center font-bold bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 w-fit">
-                            <Clock size={14} className="mr-2" /> {new Date(entry.timestamp?.seconds * 1000).toLocaleString()}
+                            <Clock size={14} className="mr-2" /> {new Date((typeof entry.timestamp.seconds === 'number' ? entry.timestamp.seconds : entry.timestamp.seconds.low) * 1000).toLocaleString()}
                           </p>
                           <p className="text-xs text-blue-600 flex items-center font-bold bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100 w-fit uppercase tracking-widest">
                              {entry.data?.ownerOrg}

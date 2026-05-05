@@ -5,6 +5,7 @@ import Cookies from 'js-cookie';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../components/ToastProvider';
 import { User } from '../types';
+import { authCookies } from '../lib/auth-cookies';
 
 interface AuthContextType {
   user: User | null;
@@ -54,24 +55,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = (token: string, role: string, email: string, org: string) => {
-    const cookieOptions = { expires: 1, path: '/' };
-    Cookies.set('auth_token', token, cookieOptions);
-    Cookies.set('user_role', role, cookieOptions);
-    Cookies.set('user_email', email, cookieOptions);
-    Cookies.set('user_org', org, cookieOptions);
+    authCookies.set(token, role, email, org);
     setUser({ email, role, org });
-    
+
     showToast('Prihlásenie úspešné', 'success');
     router.push('/dashboard');
   };
 
   const logout = () => {
-    Cookies.remove('auth_token', { path: '/' });
-    Cookies.remove('user_role', { path: '/' });
-    Cookies.remove('user_email', { path: '/' });
-    Cookies.remove('user_org', { path: '/' });
+    authCookies.clear();
     setUser(null);
-    
+
     showToast('Odhlásenie úspešné', 'info');
     router.push('/');
   };

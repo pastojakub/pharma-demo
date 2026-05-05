@@ -169,13 +169,11 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
     async finalizeAgreement(ctx, requestID) {
         const pharmacyMsp = ctx.clientIdentity.getMSPID();
         const collection = this.getCollectionName(ctx, pharmacyMsp);
-        const price = Number(this.getTransientValue(ctx, "price"));
         const orderJSON = await ctx.stub.getPrivateData(collection, requestID);
         if (!orderJSON || orderJSON.length === 0)
             throw new Error("Požiadavka neexistuje.");
         const order = JSON.parse(orderJSON.toString());
         order.status = "APPROVED";
-        order.finalAgreedPrice = price;
         await ctx.stub.putPrivateData(collection, requestID, Buffer.from(JSON.stringify(order)));
         this.emitEvent(ctx, "AgreementFinalized", { requestID, pharmacyMsp });
     }
@@ -226,11 +224,7 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
             const orderJSON = await ctx.stub.getPrivateData(orderCol, requestID);
             if (orderJSON && orderJSON.length > 0) {
                 const order = JSON.parse(orderJSON.toString());
-                order.fulfillments.push({
-                    batchID: batchID,
-                    quantity: qSent,
-                    timestamp: ctx.stub.getTxTimestamp().seconds.toString(),
-                });
+                order.fulfillments.push({ batchID: batchID, quantity: qSent, timestamp: ctx.stub.getTxTimestamp().seconds.toString(), });
                 await ctx.stub.putPrivateData(orderCol, requestID, Buffer.from(JSON.stringify(order)));
             }
         }
@@ -242,23 +236,11 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
             batch.quantity = priv.quantity;
             await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(batch)));
             const newID = `${batchID}-S${ctx.stub.getTxID().substring(0, 6)}`;
-            const newBatch = {
-                ...batch,
-                batchID: newID,
-                ownerOrg: newOwnerOrg,
-                quantity: qSent,
-                status: "IN_TRANSIT",
-                parentBatchID: batchID,
-            };
+            const newBatch = { ...batch, batchID: newID, ownerOrg: newOwnerOrg, quantity: qSent, status: "IN_TRANSIT", parentBatchID: batchID, };
             await ctx.stub.putState(newID, Buffer.from(JSON.stringify(newBatch)));
             await this.addToRegistry(ctx, "REGISTRY_BATCHES", newID);
             const targetCol = this.getCollectionName(ctx, newOwnerOrg);
-            const targetPriv = {
-                batchID: newID,
-                price: effectivePrice,
-                quantity: qSent,
-                metadata: priv.metadata,
-            };
+            const targetPriv = { batchID: newID, price: effectivePrice, quantity: qSent, metadata: priv.metadata, };
             await ctx.stub.putPrivateData(targetCol, newID, Buffer.from(JSON.stringify(targetPriv)));
             await this.addToRegistry(ctx, "REGISTRY_MY_BATCHES", newID, targetCol);
             resultingBatchID = newID;
@@ -270,21 +252,12 @@ let DrugContract = class DrugContract extends fabric_contract_api_1.Contract {
             await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(batch)));
             await ctx.stub.deletePrivateData(collection, batchID);
             const targetCol = this.getCollectionName(ctx, newOwnerOrg);
-            const targetPriv = {
-                batchID: batchID,
-                price: effectivePrice,
-                quantity: qSent,
-                metadata: priv.metadata,
-            };
+            const targetPriv = { batchID: batchID, price: effectivePrice, quantity: qSent, metadata: priv.metadata, };
             await ctx.stub.putPrivateData(targetCol, batchID, Buffer.from(JSON.stringify(targetPriv)));
             await this.addToRegistry(ctx, "REGISTRY_MY_BATCHES", batchID, targetCol);
             resultingBatchID = batchID;
         }
-        this.emitEvent(ctx, "BatchTransferred", {
-            batchID: resultingBatchID,
-            from: mspId,
-            to: newOwnerOrg,
-        });
+        this.emitEvent(ctx, "BatchTransferred", { batchID: resultingBatchID, from: mspId, to: newOwnerOrg, });
         return resultingBatchID;
     }
     async confirmDelivery(ctx, batchID) {

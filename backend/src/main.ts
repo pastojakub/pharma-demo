@@ -33,25 +33,15 @@ async function bootstrap() {
     }),
   );
 
+  const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim());
+
   app.enableCors({
-    origin: true,
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: 'Content-Type, Accept, Authorization',
-  });
-
-  // Debug Middleware: Log Authorization Header
-  app.use((req, res, next) => {
-    if (req.headers.authorization) {
-      console.log(
-        `[DEBUG] Incoming Request: ${req.method} ${req.url} - Auth Header Present`,
-      );
-    } else {
-      console.log(
-        `[DEBUG] Incoming Request: ${req.method} ${req.url} - MISSING Auth Header`,
-      );
-    }
-    next();
   });
 
   // Serve static files from 'uploads' folder
@@ -59,6 +49,7 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
 
+  app.enableShutdownHooks();
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

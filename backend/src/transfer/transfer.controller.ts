@@ -1,5 +1,5 @@
 import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
-import { FabricService } from '../fabric.service';
+import { FabricService } from '../fabric/fabric.service';
 import { TransferDto } from './transfer.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 

@@ -19,6 +19,11 @@ export interface Batch {
   metadata?: string;
   requesterOrg?: string;
   pharmacyOrg?: string;
+  integrity?: IntegrityStatus;
+  bcVerified?: boolean;
+  // fields present when a Batch slot carries an OrderRequest
+  requestId?: string;
+  drugId?: string;
 }
 
 export interface OrderRequest {
@@ -63,7 +68,9 @@ export interface TransactionHistory {
 
 export interface IntegrityStatus {
   isValid: boolean;
-  mismatchFields?: string[];
+  mismatches?: string[];
+  message?: string;
+  bc?: any;
   dbData?: any;
   bcData?: any;
 }
@@ -73,4 +80,44 @@ export interface Notification {
   type: string;
   message: string;
   createdAt: string;
+}
+
+export interface Offer {
+  id: number;
+  createdAt: string;
+  price: number;
+  status: string;
+  manufacturerOrg: string;
+  pharmacyOrg?: string;
+}
+
+export interface Fulfillment {
+  batchID: string;
+  quantity: number;
+}
+
+export interface PricingSummary {
+  pharmacy: string;
+  price: number;
+  totalQuantity: number;
+}
+
+export interface NewDrug {
+  name: string;
+  composition: string;
+  recommendedDosage: string;
+  intakeInfo: string;
+  leaflet: FileMetadata | null;
+  gallery: FileMetadata[];
+}
+
+export interface NewBatch {
+  id: string;
+  drugID: string;
+  name: string;
+  manufacturer: string;
+  expiryDate: string;
+  price: number;
+  quantity: number;
+  unit: string;
 }

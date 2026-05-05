@@ -269,7 +269,6 @@ export class DrugContract extends Contract {
 	): Promise<void> {
 		const pharmacyMsp = ctx.clientIdentity.getMSPID();
 		const collection = this.getCollectionName(ctx, pharmacyMsp);
-		const price = Number(this.getTransientValue(ctx, "price"));
 
 		const orderJSON = await ctx.stub.getPrivateData(collection, requestID);
 		if (!orderJSON || orderJSON.length === 0)
@@ -277,7 +276,6 @@ export class DrugContract extends Contract {
 
 		const order: PrivateOrderData = JSON.parse(orderJSON.toString());
 		order.status = "APPROVED";
-		order.finalAgreedPrice = price;
 
 		await ctx.stub.putPrivateData(
 			collection,
@@ -310,12 +308,7 @@ export class DrugContract extends Contract {
 	}
 
 	@Transaction()
-	public async transferOwnership(
-		ctx: Context,
-		batchID: string,
-		newOwnerOrg: string,
-		requestID: string = "",
-	): Promise<string> {
+	public async transferOwnership(ctx: Context, batchID: string, newOwnerOrg: string, requestID: string = "", ): Promise<string> {
 		const mspId = ctx.clientIdentity.getMSPID();
 		const collection = this.getCollectionName(ctx, mspId);
 		const qSent = Number(this.getTransientValue(ctx, "quantity"));
@@ -358,108 +351,46 @@ export class DrugContract extends Contract {
 				requestID,
 			);
 			if (orderJSON && orderJSON.length > 0) {
-				const order: PrivateOrderData = JSON.parse(
-					orderJSON.toString(),
-				);
-				order.fulfillments.push({
-					batchID: batchID,
-					quantity: qSent,
-					timestamp: ctx.stub.getTxTimestamp().seconds.toString(),
-				});
-				await ctx.stub.putPrivateData(
-					orderCol,
-					requestID,
-					Buffer.from(JSON.stringify(order)),
-				);
+				const order: PrivateOrderData = JSON.parse(orderJSON.toString(),);
+				order.fulfillments.push({batchID: batchID, quantity: qSent, timestamp: ctx.stub.getTxTimestamp().seconds.toString(),});
+				await ctx.stub.putPrivateData(orderCol, requestID, Buffer.from(JSON.stringify(order)),);
 			}
 		}
 
 		let resultingBatchID = batchID;
 		if (qSent < priv.quantity) {
 			priv.quantity -= qSent;
-			await ctx.stub.putPrivateData(
-				collection,
-				batchID,
-				Buffer.from(JSON.stringify(priv)),
-			);
+			await ctx.stub.putPrivateData(collection, batchID, Buffer.from(JSON.stringify(priv)),);
 
 			// Update original public batch quantity
 			batch.quantity = priv.quantity;
-			await ctx.stub.putState(
-				batchID,
-				Buffer.from(JSON.stringify(batch)),
-			);
+			await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(batch)), );
 
 			const newID = `${batchID}-S${ctx.stub.getTxID().substring(0, 6)}`;
-			const newBatch: DrugBatch = {
-				...batch,
-				batchID: newID,
-				ownerOrg: newOwnerOrg,
-				quantity: qSent,
-				status: "IN_TRANSIT",
-				parentBatchID: batchID,
-			};
-			await ctx.stub.putState(
-				newID,
-				Buffer.from(JSON.stringify(newBatch)),
-			);
+			const newBatch: DrugBatch = {...batch,batchID: newID,ownerOrg: newOwnerOrg,quantity: qSent,status: "IN_TRANSIT",parentBatchID: batchID,};
+			await ctx.stub.putState(newID, Buffer.from(JSON.stringify(newBatch)),);
 			await this.addToRegistry(ctx, "REGISTRY_BATCHES", newID);
 
 			const targetCol = this.getCollectionName(ctx, newOwnerOrg);
-			const targetPriv: PrivateBatchData = {
-				batchID: newID,
-				price: effectivePrice,
-				quantity: qSent,
-				metadata: priv.metadata,
-			};
-			await ctx.stub.putPrivateData(
-				targetCol,
-				newID,
-				Buffer.from(JSON.stringify(targetPriv)),
-			);
-			await this.addToRegistry(
-				ctx,
-				"REGISTRY_MY_BATCHES",
-				newID,
-				targetCol,
-			);
+			const targetPriv: PrivateBatchData = {batchID: newID, price: effectivePrice, quantity: qSent, metadata: priv.metadata,};
+			await ctx.stub.putPrivateData(targetCol, newID, Buffer.from(JSON.stringify(targetPriv)),);
+			await this.addToRegistry(ctx, "REGISTRY_MY_BATCHES", newID, targetCol,);
 			resultingBatchID = newID;
 		} else {
 			batch.ownerOrg = newOwnerOrg;
 			batch.status = "IN_TRANSIT";
 			batch.quantity = qSent;
-			await ctx.stub.putState(
-				batchID,
-				Buffer.from(JSON.stringify(batch)),
-			);
+			await ctx.stub.putState(batchID, Buffer.from(JSON.stringify(batch)),);
 			await ctx.stub.deletePrivateData(collection, batchID);
 
 			const targetCol = this.getCollectionName(ctx, newOwnerOrg);
-			const targetPriv: PrivateBatchData = {
-				batchID: batchID,
-				price: effectivePrice,
-				quantity: qSent,
-				metadata: priv.metadata,
-			};
-			await ctx.stub.putPrivateData(
-				targetCol,
-				batchID,
-				Buffer.from(JSON.stringify(targetPriv)),
-			);
-			await this.addToRegistry(
-				ctx,
-				"REGISTRY_MY_BATCHES",
-				batchID,
-				targetCol,
-			);
+			const targetPriv: PrivateBatchData = {batchID: batchID, price: effectivePrice, quantity: qSent, metadata: priv.metadata,};
+			await ctx.stub.putPrivateData(targetCol, batchID, Buffer.from(JSON.stringify(targetPriv)),);
+			await this.addToRegistry(ctx, "REGISTRY_MY_BATCHES", batchID, targetCol,);
 			resultingBatchID = batchID;
 		}
 
-		this.emitEvent(ctx, "BatchTransferred", {
-			batchID: resultingBatchID,
-			from: mspId,
-			to: newOwnerOrg,
-		});
+		this.emitEvent(ctx, "BatchTransferred", {batchID: resultingBatchID, from: mspId, to: newOwnerOrg,});
 		return resultingBatchID;
 	}
 

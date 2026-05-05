@@ -1,9 +1,9 @@
 /// <reference types="multer" />
-import { 
-  Controller, 
-  Post, 
-  UseInterceptors, 
-  UploadedFile, 
+import {
+  Controller,
+  Post,
+  UseInterceptors,
+  UploadedFile,
   UploadedFiles,
   UseGuards,
   BadRequestException
@@ -11,8 +11,9 @@ import {
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
-import { JwtAuthGuard } from './auth/jwt-auth.guard';
-import { IpfsService } from './ipfs.service';
+import { randomBytes } from 'crypto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { IpfsService } from '../ipfs/ipfs.service';
 import * as fromBuffer from 'file-type';
 
 const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg'];
@@ -29,15 +30,12 @@ export class UploadController {
     FileInterceptor('file', {
       storage: diskStorage({
         destination: './uploads',
-        filename: (req, file, cb) => {
-          const randomName = Array(32)
-            .fill(null)
-            .map(() => Math.round(Math.random() * 16).toString(16))
-            .join('');
+        filename: (_req, file, cb) => {
+          const randomName = randomBytes(16).toString('hex');
           cb(null, `${randomName}${extname(file.originalname).toLowerCase()}`);
         },
       }),
-      fileFilter: (req, file, cb) => {
+      fileFilter: (_req, file, cb) => {
         const ext = extname(file.originalname).toLowerCase();
         if (!ALLOWED_EXTENSIONS.includes(ext)) {
           return cb(new BadRequestException('Nepodporovaný formát súboru. Povolené sú iba PDF a obrázky.'), false);
@@ -79,15 +77,12 @@ export class UploadController {
     FilesInterceptor('files', 10, {
       storage: diskStorage({
         destination: './uploads',
-        filename: (req, file, cb) => {
-          const randomName = Array(32)
-            .fill(null)
-            .map(() => Math.round(Math.random() * 16).toString(16))
-            .join('');
+        filename: (_req, file, cb) => {
+          const randomName = randomBytes(16).toString('hex');
           cb(null, `${randomName}${extname(file.originalname).toLowerCase()}`);
         },
       }),
-      fileFilter: (req, file, cb) => {
+      fileFilter: (_req, file, cb) => {
         const ext = extname(file.originalname).toLowerCase();
         if (!ALLOWED_EXTENSIONS.includes(ext)) {
           return cb(new BadRequestException(`Súbor ${file.originalname} má nepodporovaný formát.`), false);
